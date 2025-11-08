@@ -49,4 +49,4 @@ charset-normalizer==3.4.4
 idna==3.11
 urllib3==2.5.0
 rsa==4.9.1
-cachetools==6.2.1
+cachetools==5.5.0
