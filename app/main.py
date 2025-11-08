@@ -14,12 +14,16 @@ from sentence_transformers import SentenceTransformer
 
 import logging
 
+# Crear la carpeta de logs si no existe (evita error en Render)
+log_dir = "app/logs"
+os.makedirs(log_dir, exist_ok=True)
+
 # Configurar el sistema de logs
 logging.basicConfig(
     level=logging.INFO,                              # Nivel de detalle (INFO, WARNING, ERROR, etc.)
     format="%(asctime)s - %(levelname)s - %(message)s",  # Formato de cada mensaje
     handlers=[
-        logging.FileHandler("app/logs/api.log"),     # Guarda los logs en un archivo
+        logging.FileHandler(os.path.join(log_dir, "api.log")),  # Guarda los logs en un archivo
         logging.StreamHandler()                      # Muestra también en la consola
     ]
 )
