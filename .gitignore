@@ -1,0 +1,31 @@
+# === Archivos sensibles y credenciales ===
+app/credentials/
+app/credentials/*.json
+
+# === Modelos entrenados ===
+app/models/
+*.pkl
+
+# === Logs ===
+app/logs/
+*.log
+
+# === Entornos virtuales ===
+venv/
+.env
+.env.*
+
+# === Caché y archivos temporales ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.pyo
+*.pyd
+
+# === macOS y VSCode ===
+.DS_Store
+.vscode/
+
+# === Pytest ===
+.pytest_cache/
