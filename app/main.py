@@ -353,42 +353,7 @@ def classify_emails(limit: int = 3):
     except Exception as e:
         return {"error": str(e)}
 
-
-# ======================================================
-# 🔒 REFERENCIA: CONFIGURACIÓN PARA ENTORNO DE PRODUCCIÓN (HTTPS)
-# ======================================================
-# Este bloque se aplicará cuando el sistema sea desplegado
-# en un servidor con dominio seguro (HTTPS).
-# No modificar hasta que se realice el despliegue final.
-
-"""
-import os
-
-# 1️⃣ Cambiar el entorno de ejecución
-# En el servidor, establecer: export ENV=production
-ENVIRONMENT = os.getenv("ENV", "production")
-
-# 2️⃣ Ajustar la URL base al dominio real del sistema
-BASE_URL = "https://tuservidor.com"  # ← actualizar al desplegar
-
-# 3️⃣ Desactivar transporte inseguro (ya no se usa HTTP)
-if "OAUTHLIB_INSECURE_TRANSPORT" in os.environ:
-    del os.environ["OAUTHLIB_INSECURE_TRANSPORT"]
-
-# 4️⃣ Endpoint de autorización para entorno de producción
-@app.get("/authorize")
-def authorize_production():
-    '''
-    Flujo de autorización para entorno de producción (HTTPS obligatorio)
-    '''
-    credentials_path = "app/credentials/client_secret.json"
-    flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
-    auth_url, _ = flow.authorization_url(
-        redirect_uri=f"{BASE_URL}/oauth2callback",
-        prompt="consent"
-    )
-    return RedirectResponse(auth_url)
-"""
-# ======================================================
-# FIN DEL BLOQUE DE REFERENCIA
-# ======================================================
+# Redirigir la ruta raíz hacia la documentación Swagger
+@app.get("/", include_in_schema=False)
+async def redirect_to_docs():
+    return RedirectResponse(url="/docs")
