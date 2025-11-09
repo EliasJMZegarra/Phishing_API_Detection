@@ -3,12 +3,12 @@ app/credentials/
 app/credentials/*.json
 
 # === Modelos entrenados ===
-app/models/
-*.pkl
+# app/models/
+# *.pkl
 
 # === Logs ===
 app/logs/
-*.log
+# *.log
 
 # === Entornos virtuales ===
 venv/
