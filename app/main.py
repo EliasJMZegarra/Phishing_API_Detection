@@ -127,44 +127,62 @@ def healthcheck():
     except Exception as e:
         return {"status": "error", "message": f"Model loading issue: {str(e)}"}
 
-
+# === CONFIGURACIÓN OAUTH2 PRODUCCIÓN ===
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 CLIENT_SECRETS_FILE = "app/credentials/client_secret.json"
+REDIRECT_URI = "https://phishing-api-detection.onrender.com/oauth2callback"
 
 
 @app.get("/authorize")
 def authorize():
-    """Inicia el flujo de autorización de Gmail API (versión web)."""
+    """
+    Inicia el flujo de autorización OAuth2 en producción.
+    Redirige al usuario al portal de Google para conceder permisos.
+    """
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri="http://localhost:8000/oauth2callback"
+        redirect_uri=REDIRECT_URI
     )
     authorization_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent"
     )
+    logger.info("Redirigiendo al usuario a Google para autorización.")
     return RedirectResponse(authorization_url)
 
 
 @app.get("/oauth2callback")
 def oauth2callback(request: Request):
-    """Recibe el código de Google y guarda el token de acceso."""
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri="http://localhost:8000/oauth2callback"
-    )
-    flow.fetch_token(authorization_response=str(request.url))
+    """
+    Recibe el código de autenticación de Google y genera el token de acceso.
+    Este token se almacena en app/credentials/token.json dentro del servidor Render.
+    """
+    try:
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+        flow.fetch_token(authorization_response=str(request.url))
 
-    credentials = flow.credentials
-    token_path = "app/credentials/token.json"
-    with open(token_path, "w") as token_file:
-        token_file.write(credentials.to_json())
+        credentials = flow.credentials
+        token_path = "app/credentials/token.json"
 
-    return {"message": "Autenticación completada correctamente"}
+        os.makedirs(os.path.dirname(token_path), exist_ok=True)
+        with open(token_path, "w") as token_file:
+            token_file.write(credentials.to_json())
 
+        logger.info("Token de autenticación generado correctamente.")
+        return {
+            "message": "Autenticación completada correctamente ✅",
+            "details": "El archivo token.json ha sido creado en el servidor."
+        }
+
+    except Exception as e:
+        logger.error(f"Error durante la autenticación: {str(e)}")
+        return {"error": str(e)}
 
 @app.get("/gmail/test")
 def test_gmail_connection():
