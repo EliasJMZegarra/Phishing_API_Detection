@@ -1,0 +1,25 @@
+# === Entornos virtuales y dependencias locales ===
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.pyo
+*.pyd
+
+# === Archivos temporales y logs ===
+app/logs/
+*.log
+
+# === Configuración local y editor ===
+.vscode/
+.DS_Store
+
+# === Archivos de pruebas ===
+.pytest_cache/
+
+# === Archivos que no deben ir al contenedor ===
+.env
+.env.*
+README.md
+.git
+.gitignore
