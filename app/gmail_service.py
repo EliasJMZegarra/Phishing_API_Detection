@@ -1,5 +1,6 @@
 # app/gmail_service.py
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import base64
 from email import message_from_bytes
@@ -8,18 +9,27 @@ import os
 def get_gmail_service():
     """
     Crea y devuelve una instancia autenticada del servicio Gmail.
-    Utiliza el token.json generado previamente.
+    Si el token ha expirado, lo renueva automáticamente usando el refresh_token.
     """
     creds = None
     token_path = "app/credentials/token.json"
+    scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
 
-    # Carga el token de autenticación guardado
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path)
-    else:
+    # Verificar existencia del token
+    if not os.path.exists(token_path):
         raise FileNotFoundError("⚠️ No se encontró el archivo token.json. Realice la autorización primero.")
 
-    # Construye el servicio Gmail
+    # Cargar las credenciales
+    creds = Credentials.from_authorized_user_file(token_path, scopes)
+
+    # 🔁 Verificar si el token ha expirado y renovarlo automáticamente
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        with open(token_path, "w") as token_file:
+            token_file.write(creds.to_json())
+        print("🔄 Token renovado automáticamente.")
+
+    # Crear el servicio de Gmail
     service = build("gmail", "v1", credentials=creds)
     return service
 
