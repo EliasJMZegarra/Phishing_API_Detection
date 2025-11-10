@@ -14,6 +14,9 @@ from sentence_transformers import SentenceTransformer
 
 import logging
 
+# Permitir el uso de OAuth2 detrás de proxy HTTPS (Render usa HTTP interno)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 # Crear la carpeta de logs si no existe (evita error en Render)
 log_dir = "app/logs"
 os.makedirs(log_dir, exist_ok=True)
