@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 import base64
 from email import message_from_bytes
 import os
+import re
 
 def get_gmail_service():
     """
@@ -54,20 +55,30 @@ def get_email_details(service, msg_id):
         elif name == "date":
             date = header["value"]
 
-    # Decodificar el cuerpo del mensaje (soporta texto plano o HTML)
-    body = "Sin contenido"
-    if "parts" in payload:
-        for part in payload["parts"]:
-            if part["mimeType"] == "text/plain":
-                data = part["body"].get("data")
-                if data:
-                    body = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
-                    break
-    else:
-        data = payload.get("body", {}).get("data")
-        if data:
-            body = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+    # --- Función recursiva para extraer texto ---
+    def extract_body(part):
+        if part.get("mimeType") == "text/plain":
+            data = part.get("body", {}).get("data")
+            if data:
+                return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+        elif part.get("mimeType") == "text/html":
+            data = part.get("body", {}).get("data")
+            if data:
+                text = base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                # Limpieza básica de etiquetas HTML
+                text = re.sub(r"<[^>]+>", " ", text)
+                return text
+        elif "parts" in part:
+            for subpart in part["parts"]:
+                text = extract_body(subpart)
+                if text:
+                    return text
+        return ""
 
+    # --- Obtener cuerpo principal ---
+    body = extract_body(payload)
+    if not body.strip():
+        body = "Sin contenido"
     return {
         "id": msg_id,
         "subject": subject,
