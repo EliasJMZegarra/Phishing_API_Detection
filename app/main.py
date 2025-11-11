@@ -132,7 +132,9 @@ def healthcheck():
         return {"status": "error", "message": f"Model loading issue: {str(e)}"}
 
 # === CONFIGURACIÓN OAUTH2 PRODUCCIÓN ===
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/script.external_request",
+          "https://www.googleapis.com/auth/gmail.addons.execute"]
 CLIENT_SECRETS_FILE = "app/credentials/client_secret.json"
 REDIRECT_URI = "https://phishing-api-detection.onrender.com/oauth2callback"
 
