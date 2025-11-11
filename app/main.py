@@ -12,6 +12,7 @@ import joblib
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+
 import logging
 
 # Permitir el uso de OAuth2 detrás de proxy HTTPS (Render usa HTTP interno)
@@ -320,13 +321,47 @@ def analyze_emails(limit: int = 3):
 
 # Endpoint para clasificación compacta (para el Add-on)
 @app.get("/gmail/classify")
-def classify_emails(limit: int = 3):
+def classify_emails(message_id: str = None, limit: int = 3):
     """
-    Obtiene los últimos correos y devuelve solo su clasificación y nivel de riesgo.
+    Clasifica un correo específico (si se pasa message_id) 
+    o los últimos correos (si se pasa limit).
     Diseñado para uso directo en el Add-on de Gmail.
     """
     try:
         service = get_gmail_service()
+
+        # --- Caso 1: Clasificación individual (desde el Add-on) ---
+        if message_id:
+            email_data = get_email_details(service, message_id)
+            text = email_data.get("body", "").strip()
+
+            if not text:
+                return {"message": f"El correo {message_id} no contiene texto."}
+
+            # Detección y traducción automática
+            detected_lang = detect(text)
+            translated_text = (
+                text if detected_lang == "en"
+                else GoogleTranslator(source="auto", target="en").translate(text)
+            )
+
+            # Generar embedding y predecir
+            embedding = embedding_model.encode([translated_text])
+            prediction_prob = model_clf.predict_proba(embedding)[0][1]
+            prediction = 1 if prediction_prob >= best_threshold else 0
+            label = label_encoder.inverse_transform([prediction])[0]
+
+            return {
+                "status": "Clasificación completada ✅",
+                "total_emails": 1,
+                "results": [{
+                    "id": message_id,
+                    "classification": label,
+                    "risk_level": round(float(prediction_prob) * 100, 2)
+                }]
+            }
+
+        # --- Caso 2: Clasificación múltiple (funcionamiento original) ---
         results = service.users().messages().list(userId="me", maxResults=limit).execute()
         messages = results.get("messages", [])
 
@@ -343,14 +378,12 @@ def classify_emails(limit: int = 3):
                 classification = "Sin contenido"
                 confidence = 0.0
             else:
-                # Detección y traducción automática
                 detected_lang = detect(text)
                 translated_text = (
                     text if detected_lang == "en"
                     else GoogleTranslator(source="auto", target="en").translate(text)
                 )
 
-                # Generar embedding y predecir
                 embedding = embedding_model.encode([translated_text])
                 prediction_prob = model_clf.predict_proba(embedding)[0][1]
                 prediction = 1 if prediction_prob >= best_threshold else 0
