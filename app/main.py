@@ -54,7 +54,7 @@ label_encoder = joblib.load(encoder_path)
 best_threshold = joblib.load(threshold_path)
 
 # Cargar el modelo de embeddings
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+embedding_model = SentenceTransformer('app/models/bert')  #Carga el modelo en local
 
 print("Modelos cargados correctamente.")
 print("Clases del LabelEncoder:", label_encoder.classes_)
