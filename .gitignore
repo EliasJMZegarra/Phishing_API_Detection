@@ -1,6 +1,11 @@
 # === Archivos sensibles y credenciales ===
 app/credentials/
 app/credentials/*.json
+app/credentials/*.txt
+app/credentials/*.pkl
+token.json
+*.pem
+*.key
 
 # === Modelos entrenados ===
 # app/models/
