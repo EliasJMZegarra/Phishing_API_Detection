@@ -1,8 +1,6 @@
 # === Archivos sensibles y credenciales ===
 app/credentials/
 app/credentials/*.json
-app/credentials/*.txt
-app/credentials/*.pkl
 token.json
 *.pem
 *.key
@@ -13,7 +11,7 @@ token.json
 
 # === Logs ===
 app/logs/
-# *.log
+*.log
 
 # === Entornos virtuales ===
 venv/
