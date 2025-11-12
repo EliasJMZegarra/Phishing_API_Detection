@@ -1,7 +1,7 @@
 # ==== CORE ML LIBRARIES ====
-torch==2.3.1
-torchvision==0.18.1
-torchaudio==2.3.1
+torch==2.2.2
+torchvision==0.17.2
+torchaudio==2.2.2
 transformers==4.42.4
 sentence-transformers==3.0.1
 scikit-learn==1.7.2
@@ -25,11 +25,11 @@ googleapis-common-protos==1.71.0
 # ==== UTILITIES ====
 httpx==0.28.1
 httplib2==0.31.0
-requests==2.32.5
+requests==2.32.3
 requests-oauthlib==2.0.0
 deep-translator==1.11.4
 langdetect==1.0.9
-regex==2025.10.23
+regex==2024.11.6
 tqdm==4.67.1
 
 # ==== DATA & SYSTEM TOOLS ====
@@ -37,7 +37,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 typing_extensions==4.15.0
 Jinja2==3.1.6
-MarkupSafe==3.0.3
+MarkupSafe==3.0.2
 packaging==25.0
 PyYAML==6.0.3
 filelock==3.20.0

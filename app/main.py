@@ -53,6 +53,13 @@ model_clf = joblib.load(model_path)
 label_encoder = joblib.load(encoder_path)
 best_threshold = joblib.load(threshold_path)
 
+# Verificar si el modelo local existe; si no, descargarlo automáticamente
+if not os.path.exists("app/models/bert"):
+    print("⚠️ Carpeta del modelo no encontrada. Descargando modelo 'all-MiniLM-L6-v2'...")
+    model_temp = SentenceTransformer('all-MiniLM-L6-v2')
+    model_temp.save('app/models/bert')
+    print("✅ Modelo descargado y guardado en app/models/bert")
+
 # Cargar el modelo de embeddings
 embedding_model = SentenceTransformer('app/models/bert')  #Carga el modelo en local
 
