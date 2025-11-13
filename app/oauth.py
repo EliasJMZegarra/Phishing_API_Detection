@@ -21,7 +21,7 @@ else:
 
 # === Ruta y credenciales ===
 if LOCAL_ENV:
-    CLIENT_SECRET_FILE = "app/credentials/client_secret.json"
+    CLIENT_SECRET_FILE = "/etc/secrets/client_secret.json"
     with open(CLIENT_SECRET_FILE, "r") as f:
         secrets = json.load(f)["web"]
     CLIENT_ID = secrets["client_id"]
