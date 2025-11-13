@@ -11,7 +11,7 @@ import os
 import joblib
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+from app.oauth import router as oauth_router
 
 import logging
 
@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 # Inicializar la aplicación FastAPI
 app = FastAPI(title="Phishing Detection API", version="1.0", 
               description="Esta API permite detectar si un correo electrónico es **Phishing** o **Seguro** utilizando un modelo de aprendizaje automático basado en *Sentence Transformers (all-MiniLM-L6-v2)*.")
+
+# Registrar las rutas OAuth (autenticación Google)
+
+app.include_router(oauth_router)
 
 # Modelo de entrada
 class EmailRequest(BaseModel):
@@ -138,64 +142,6 @@ def healthcheck():
     except Exception as e:
         return {"status": "error", "message": f"Model loading issue: {str(e)}"}
 
-# === CONFIGURACIÓN OAUTH2 PRODUCCIÓN ===
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly",
-          "https://www.googleapis.com/auth/script.external_request",
-          "https://www.googleapis.com/auth/gmail.addons.execute"]
-CLIENT_SECRETS_FILE = "app/credentials/client_secret.json"
-REDIRECT_URI = "https://phishing-api-detection.onrender.com/oauth2callback"
-
-
-@app.get("/authorize")
-def authorize():
-    """
-    Inicia el flujo de autorización OAuth2 en producción.
-    Redirige al usuario al portal de Google para conceder permisos.
-    """
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri=REDIRECT_URI
-    )
-    authorization_url, state = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent"
-    )
-    logger.info("Redirigiendo al usuario a Google para autorización.")
-    return RedirectResponse(authorization_url)
-
-
-@app.get("/oauth2callback")
-def oauth2callback(request: Request):
-    """
-    Recibe el código de autenticación de Google y genera el token de acceso.
-    Este token se almacena en app/credentials/token.json dentro del servidor Render.
-    """
-    try:
-        flow = Flow.from_client_secrets_file(
-            CLIENT_SECRETS_FILE,
-            scopes=SCOPES,
-            redirect_uri=REDIRECT_URI
-        )
-        flow.fetch_token(authorization_response=str(request.url))
-
-        credentials = flow.credentials
-        token_path = "app/credentials/token.json"
-
-        os.makedirs(os.path.dirname(token_path), exist_ok=True)
-        with open(token_path, "w") as token_file:
-            token_file.write(credentials.to_json())
-
-        logger.info("Token de autenticación generado correctamente.")
-        return {
-            "message": "Autenticación completada correctamente ✅",
-            "details": "El archivo token.json ha sido creado en el servidor."
-        }
-
-    except Exception as e:
-        logger.error(f"Error durante la autenticación: {str(e)}")
-        return {"error": str(e)}
 
 @app.get("/gmail/test")
 def test_gmail_connection():
