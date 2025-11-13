@@ -4,6 +4,7 @@ services:
     env: python
     plan: standard #free anteriormente
     buildCommand: |
+      echo "python-3.10.14" > runtime.txt
       pip install -r requirements.txt
       python download_model.py
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port 10000"
