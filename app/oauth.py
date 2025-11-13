@@ -21,16 +21,21 @@ else:
 
 # === Ruta y credenciales ===
 if LOCAL_ENV:
-    CLIENT_SECRET_FILE = "/etc/secrets/client_secret.json"
-    with open(CLIENT_SECRET_FILE, "r") as f:
-        secrets = json.load(f)["web"]
-    CLIENT_ID = secrets["client_id"]
-    CLIENT_SECRET = secrets["client_secret"]
-    REDIRECT_URI = secrets["redirect_uris"][0]
+    # Entorno local
+    CLIENT_SECRET_FILE = "app/credentials/client_secret.json"
+    redirect_index = 0          # primer redirect_uri: localhost
 else:
-    CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-    CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-    REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
+    # Entorno Render (producción)
+    CLIENT_SECRET_FILE = "/etc/secrets/client_secret.json"
+    redirect_index = 1          # segundo redirect_uri: Render
+
+with open(CLIENT_SECRET_FILE, "r") as f:
+    secrets = json.load(f)["web"]
+
+CLIENT_ID = secrets["client_id"]
+CLIENT_SECRET = secrets["client_secret"]
+REDIRECT_URI = secrets["redirect_uris"][redirect_index]
+
 
 # === Endpoint /authorize ===
 @router.get("/authorize")
