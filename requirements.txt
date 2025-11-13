@@ -1,7 +1,7 @@
 # ==== CORE ML LIBRARIES ====
-torch==2.2.2
-torchvision==0.17.2
-torchaudio==2.2.2
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
 transformers==4.42.4
 sentence-transformers==3.0.1
 scikit-learn==1.7.2
