@@ -40,17 +40,10 @@ REDIRECT_URI = secrets["redirect_uris"][redirect_index]
 # === Endpoint /authorize ===
 @router.get("/authorize")
 def authorize():
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": CLIENT_ID,
-                "client_secret": CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [REDIRECT_URI],
-            }
-        },
-        scopes=SCOPES
+    flow = Flow.from_client_secrets_file(
+       CLIENT_SECRET_FILE,
+       scopes=SCOPES,
+       redirect_uri=REDIRECT_URI
     )
     auth_url, _ = flow.authorization_url(
         prompt="consent", access_type="offline", include_granted_scopes="true"
@@ -61,17 +54,10 @@ def authorize():
 @router.get("/oauth2callback")
 async def oauth2callback(request: Request):
     try:
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": CLIENT_ID,
-                    "client_secret": CLIENT_SECRET,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [REDIRECT_URI],
-                }
-            },
-            scopes=SCOPES
+        flow = Flow.from_client_secrets_file(
+           CLIENT_SECRET_FILE,
+           scopes=SCOPES,
+           redirect_uri=REDIRECT_URI
         )
 
         params = dict(request.query_params)
@@ -81,10 +67,12 @@ async def oauth2callback(request: Request):
         code = params.get("code")
         if not code:
             return JSONResponse({"error": "Authorization code missing."}, status_code=400)
-
+        
+        # Intercambio del código por el token
         flow.fetch_token(code=code)
         creds = flow.credentials
-
+        
+        # Guardar token
         os.makedirs(os.path.dirname(TOKEN_PATH), exist_ok=True)
         with open(TOKEN_PATH, "w") as f:
             f.write(creds.to_json())
