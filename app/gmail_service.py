@@ -12,25 +12,31 @@ def get_gmail_service():
     Crea y devuelve una instancia autenticada del servicio Gmail.
     Si el token ha expirado, lo renueva automáticamente usando el refresh_token.
     """
-    creds = None
     token_path = "app/credentials/token.json"
-    scopes = ["https://www.googleapis.com/auth/gmail.readonly"]
+    
+    # === Usar EXACTAMENTE los mismos scopes que usa OAuth ===
+    scopes = [
+        "https://www.googleapis.com/auth/gmail.addons.execute",
+        "https://www.googleapis.com/auth/script.external_request",
+        "https://www.googleapis.com/auth/gmail.readonly"
+    ]
 
-    # Verificar existencia del token
+    # === Validar existencia de token.json ===
     if not os.path.exists(token_path):
-        raise FileNotFoundError("⚠️ No se encontró el archivo token.json. Realice la autorización primero.")
+        raise FileNotFoundError(
+            "⚠️ token.json no existe. Debe completar /authorize primero."
+        )
 
-    # Cargar las credenciales
+    # === Cargar credenciales ===
     creds = Credentials.from_authorized_user_file(token_path, scopes)
 
-    # 🔁 Verificar si el token ha expirado y renovarlo automáticamente
-    if creds and creds.expired and creds.refresh_token:
+    # === Renovar token si expiró y tiene refresh_token ===
+    if creds.expired and creds.refresh_token:
         creds.refresh(Request())
         with open(token_path, "w") as token_file:
             token_file.write(creds.to_json())
-        print("🔄 Token renovado automáticamente.")
 
-    # Crear el servicio de Gmail
+    # === Crear servicio Gmail ===
     service = build("gmail", "v1", credentials=creds)
     return service
 
