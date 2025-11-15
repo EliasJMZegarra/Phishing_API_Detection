@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from google_auth_oauthlib.flow import Flow
@@ -10,8 +10,15 @@ from deep_translator import GoogleTranslator
 import os
 import joblib
 import numpy as np
+from typing import Optional
 from sentence_transformers import SentenceTransformer
 from app.oauth import router as oauth_router
+from app.services.users_service import UsersService
+from app.services.emails_service import EmailsService
+from app.services.predicciones_service import PrediccionesService
+from app.database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 import logging
 
@@ -194,192 +201,147 @@ def read_emails(limit: int = 3):
         return {"error": str(e)}
     
 
-# Endpoint para analizar detalladamente correos reales con el modelo BERT
-@app.get("/gmail/analyze")
-def analyze_emails(limit: int = 3):
-    """
-    Obtiene los últimos correos de Gmail y los analiza con el modelo de IA.
-    Retorna asunto, remitente, fecha, cuerpo, idioma, traducción y clasificación.
-    """
-    try:
-        service = get_gmail_service()
-        results = service.users().messages().list(userId="me", maxResults=limit).execute()
-        messages = results.get("messages", [])
-
-        if not messages:
-            return {"message": "No se encontraron correos."}
-
-        analyzed_emails = []
-
-        for msg in messages:
-            email_data = get_email_details(service, msg["id"])
-            text = email_data.get("body", "").strip()
-
-            # Si el cuerpo está vacío, se descarta el análisis
-            if not text:
-                analyzed_emails.append({
-                    "id": email_data.get("id"),
-                    "subject": email_data.get("subject"),
-                    "from": email_data.get("from"),
-                    "date": email_data.get("date"),
-                    "language": "unknown",
-                    "translated": False,
-                    "classification": "Sin contenido",
-                    "confidence": 0.0,
-                    "risk_level": "N/A",
-                    "body": None
-                })
-                continue
-
-            # 🔹 Detección automática del idioma
-            detected_lang = detect(text)
-            translated_text = text
-            was_translated = False
-
-            if detected_lang != "en":
-                translated_text = GoogleTranslator(source="auto", target="en").translate(text)
-                was_translated = True
-
-            # 🔹 Embedding y predicción usando texto traducido
-            embedding = embedding_model.encode([translated_text])
-            prediction_prob = model_clf.predict_proba(embedding)[0][1]
-            prediction = 1 if prediction_prob >= best_threshold else 0
-            label = label_encoder.inverse_transform([prediction])[0]
-
-            # 🔹 Calcular porcentaje de riesgo
-            confidence = round(float(prediction_prob) * 100, 2)
-            risk = f"{confidence}%"
-
-            analyzed_emails.append({
-                "id": email_data.get("id"),
-                "subject": email_data.get("subject"),
-                "from": email_data.get("from"),
-                "body": text,
-                "date": email_data.get("date"),
-                "language": detected_lang,
-                "translated": was_translated,
-                "translated_text": translated_text if was_translated else None,
-                "classification": label,
-                "risk_level": risk
-                
-            })
-
-        return {
-            "status": "Análisis completado ✅",
-            "total_emails_analyzed": len(analyzed_emails),
-            "results": analyzed_emails
-        }
-
-    except Exception as e:
-        return {"error": str(e)}
-
-
 # Endpoint para clasificación compacta (para el Add-on)
 @app.get("/gmail/classify")
-def classify_emails(message_id: str = None, limit: int = 3):
+def classify_email(message_id: Optional[str] = None):
     """
-    Clasifica un correo específico (si se pasa message_id) 
-    o los últimos correos (si se pasa limit).
-    Diseñado para uso directo en el Add-on de Gmail.
+    Clasifica rápidamente un correo específico.
+    Uso exclusivo para el Add-on de Gmail.
     """
     try:
+        if not message_id:
+            return {"error": "Se requiere message_id para clasificar el correo."}
+
         service = get_gmail_service()
+        email_data = get_email_details(service, message_id)
+        text = email_data.get("body", "").strip()
 
-        # --- Caso 1: Clasificación individual (desde el Add-on) ---
-        if message_id:
-            email_data = get_email_details(service, message_id)
-            text = email_data.get("body", "").strip()
-
-            if not text:
-                return {"message": f"El correo {message_id} no contiene texto."}
-
-            # Detección y traducción automática
-            detected_lang = detect(text)
-            translated_text = (
-                text if detected_lang == "en"
-                else GoogleTranslator(source="auto", target="en").translate(text)
-            )
-
-            # Generar embedding y predecir
-            embedding = embedding_model.encode([translated_text])
-            prediction_prob = model_clf.predict_proba(embedding)[0][1]
-            prediction = 1 if prediction_prob >= best_threshold else 0
-            label = label_encoder.inverse_transform([prediction])[0]
-
+        if not text:
             return {
-                "status": "Clasificación completada ✅",
-                "total_emails": 1,
-                "results": [{
-                    "id": message_id,
-                    "classification": label,
-                    "risk_level": round(float(prediction_prob) * 100, 2)
-                }]
+                "status": "OK",
+                "id": message_id,
+                "classification": "Sin contenido",
+                "risk_level": 0.0
             }
 
-        # --- Caso 2: Clasificación múltiple (funcionamiento original) ---
-        results = service.users().messages().list(userId="me", maxResults=limit).execute()
-        messages = results.get("messages", [])
+        # --- Detección y traducción ---
+        detected_lang = detect(text)
+        translated_text = (
+            text if detected_lang == "en"
+            else GoogleTranslator(source="auto", target="en").translate(text)
+        )
 
-        if not messages:
-            return {"message": "No se encontraron correos."}
-
-        classified_emails = []
-
-        for msg in messages:
-            email_data = get_email_details(service, msg["id"])
-            text = email_data.get("body", "").strip()
-
-            if not text:
-                classification = "Sin contenido"
-                confidence = 0.0
-            else:
-                detected_lang = detect(text)
-                translated_text = (
-                    text if detected_lang == "en"
-                    else GoogleTranslator(source="auto", target="en").translate(text)
-                )
-
-                embedding = embedding_model.encode([translated_text])
-                prediction_prob = model_clf.predict_proba(embedding)[0][1]
-                prediction = 1 if prediction_prob >= best_threshold else 0
-                label = label_encoder.inverse_transform([prediction])[0]
-
-                classification = label
-                confidence = round(float(prediction_prob) * 100, 2)
-
-            classified_emails.append({
-                "id": email_data.get("id"),
-                "classification": classification,
-                "risk_level": f"{confidence}%"
-            })
+        # --- Embedding + predicción ---
+        embedding = embedding_model.encode([translated_text])
+        prediction_prob = model_clf.predict_proba(embedding)[0][1]
+        prediction = 1 if prediction_prob >= best_threshold else 0
+        label = label_encoder.inverse_transform([prediction])[0]
 
         return {
-            "status": "Clasificación completada ✅",
-            "total_emails": len(classified_emails),
-            "results": classified_emails
+            "status": "Clasificación completada",
+            "id": message_id,
+            "classification": label,
+            "risk_level": round(float(prediction_prob) * 100, 2)
         }
 
     except Exception as e:
         return {"error": str(e)}
+
 
 # Endpoints para reportes de phishing manuales desde el Add-on
 @app.post("/gmail/report")
-async def report_phishing(data: dict):
+async def report_phishing(
+    data: dict,
+    db=Depends(get_db),
+    users_service: UsersService = Depends(),
+    emails_service: EmailsService = Depends(),
+    pred_service: PrediccionesService = Depends(),
+):
     """
-    Endpoint simple para registrar un reporte manual desde el Add-on.
-    Se puede reemplazar más adelante por guardado en PostgreSQL.
+    Guarda un reporte explícito de phishing desde el Add-on.
     """
-    print("📩 Reporte de phishing recibido:", data)
-    return {"status": "ok", "message": "Reporte registrado"}
+    message_id = data.get("message_id")
+    user_email = data.get("user_email")
+
+    if not message_id or not user_email:
+        return {"status": "error", "message": "Faltan parámetros obligatorios."}
+
+    # 1. Registrar usuario si no existe
+    usuario = await users_service.create_if_not_exists(db, user_email)
+
+    # 2. Obtener el correo desde Gmail
+    service = get_gmail_service()
+    email_data = get_email_details(service, message_id)
+
+    # 3. Preparar datos para la tabla Emails
+    email_data_to_save = {
+        "user_id": usuario.id,                     # ← FK
+        "message_id": email_data.get("id"),
+        "subject": email_data.get("subject"),
+        "sender": email_data.get("from"),
+        "date": email_data.get("date"),
+        "body": email_data.get("body"),
+    }
+
+    # 4. Guardar correo en BD 
+    email_record = await emails_service.save_email(db, email_data_to_save)
+
+    # 5. Guardar predicción manual (phishing)
+    await pred_service.save_prediction(db, {
+        "email_id": email_record.id,
+        "prediccion": "phishing",
+        "risk_level": None,   # manual, sin probabilidad
+    })
+
+    return {"status": "ok", "message": "Reporte de phishing registrado correctamente."}
+
 
 # Endpoint para marcar un correo como seguro desde el Add-on
 @app.post("/gmail/safe")
-async def mark_safe(data: dict):
+async def mark_safe(
+    data: dict,
+    db=Depends(get_db),
+    users_service: UsersService = Depends(),
+    emails_service: EmailsService = Depends(),
+    pred_service: PrediccionesService = Depends(),
+):
     """
-    Endpoint simple para registrar que un usuario marcó un correo como seguro.
+    Guarda un reporte explícito de correo seguro desde el Add-on.
     """
-    print("📩 Marcado como seguro:", data)
-    return {"status": "ok", "message": "Marcado como seguro registrado"}
+    message_id = data.get("message_id")
+    user_email = data.get("user_email")
+
+    if not message_id or not user_email:
+        return {"status": "error", "message": "Faltan parámetros obligatorios."}
+
+    # 1. Registrar usuario si no existe
+    usuario = await users_service.create_if_not_exists(db, user_email)
+
+    # 2. Obtener el correo desde Gmail
+    service = get_gmail_service()
+    email_data = get_email_details(service, message_id)
+
+    # 3. Preparar datos para la tabla Emails
+    email_data_to_save = {
+        "user_id": usuario.id,
+        "message_id": email_data.get("id"),
+        "subject": email_data.get("subject"),
+        "sender": email_data.get("from"),
+        "date": email_data.get("date"),
+        "body": email_data.get("body"),
+    }
+
+    # 4. Guardar correo
+    email_record = await emails_service.save_email(db, email_data_to_save)
+
+    # 5. Guardar predicción manual (legitimate)
+    await pred_service.save_prediction(db, {
+        "email_id": email_record.id,
+        "prediccion": "legitimate",
+        "risk_level": None,
+    })
+
+    return {"status": "ok", "message": "Correo marcado como seguro correctamente."}
 
 
 # Redirigir la ruta raíz hacia la documentación Swagger

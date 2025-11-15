@@ -4,8 +4,8 @@ from app.models_sql.tables import Email
 
 
 class EmailsRepository:
-
     async def save_email(self, db: AsyncSession, data: dict) -> Email:
+        # data se espera con claves: user_id, message_id, subject, sender, date, body
         new_email = Email(**data)
         db.add(new_email)
         await db.commit()
@@ -16,3 +16,4 @@ class EmailsRepository:
         query = select(Email).where(Email.id == email_id)
         result = await db.execute(query)
         return result.scalars().first()
+
