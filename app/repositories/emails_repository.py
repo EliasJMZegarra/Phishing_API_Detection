@@ -16,4 +16,12 @@ class EmailsRepository:
         query = select(Email).where(Email.id == email_id)
         result = await db.execute(query)
         return result.scalars().first()
+    
+    async def list_all(self, db: AsyncSession):
+        """
+        Retorna todos los correos almacenados.
+        """
+        query = select(Email).order_by(Email.received_date.desc())
+        result = await db.execute(query)
+        return result.scalars().all()
 

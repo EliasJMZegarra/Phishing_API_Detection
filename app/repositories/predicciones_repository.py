@@ -1,10 +1,7 @@
 from typing import Sequence
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models_sql.tables import Prediccion
-
-
 class PrediccionesRepository:
     async def save_prediction(self, db: AsyncSession, data: dict) -> Prediccion:
         new_pred = Prediccion(
@@ -25,3 +22,12 @@ class PrediccionesRepository:
         query = select(Prediccion).where(Prediccion.email_id == email_id)
         result = await db.execute(query)
         return result.scalars().all()
+    
+    async def list_all(self, db: AsyncSession):
+        """
+        Retorna todas las predicciones generadas o manuales.
+        """
+        query = select(Prediccion).order_by(Prediccion.created_at.desc())
+        result = await db.execute(query)
+        return result.scalars().all()
+

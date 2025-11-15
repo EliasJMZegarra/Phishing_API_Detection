@@ -12,3 +12,6 @@ class PrediccionesService:
 
     async def get_predictions_by_email(self, db: AsyncSession, email_id: int):
         return await self.repo.get_predictions_by_email(db, email_id)
+
+    async def list_all(self, db: AsyncSession):
+        return await self.repo.list_all(db)

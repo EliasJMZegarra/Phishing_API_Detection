@@ -18,6 +18,7 @@ from app.services.emails_service import EmailsService
 from app.services.predicciones_service import PrediccionesService
 from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.routers.dashboard import router as dashboard_router
 
 
 import logging
@@ -47,8 +48,10 @@ app = FastAPI(title="Phishing Detection API", version="1.0",
               description="Esta API permite detectar si un correo electrónico es **Phishing** o **Seguro** utilizando un modelo de aprendizaje automático basado en *Sentence Transformers (all-MiniLM-L6-v2)*.")
 
 # Registrar las rutas OAuth (autenticación Google)
-
 app.include_router(oauth_router)
+
+# Registrar los routers del dashboard
+app.include_router(dashboard_router)
 
 # Modelo de entrada
 class EmailRequest(BaseModel):

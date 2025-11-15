@@ -18,3 +18,6 @@ class UsersService:
         if existing:
             return existing
         return await self.repo.create_user(db, email)
+   
+    async def list_all(self, db: AsyncSession):
+        return await self.repo.list_all(db)
