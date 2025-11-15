@@ -362,6 +362,26 @@ def classify_emails(message_id: str = None, limit: int = 3):
     except Exception as e:
         return {"error": str(e)}
 
+# Endpoints para reportes de phishing manuales desde el Add-on
+@app.post("/gmail/report")
+async def report_phishing(data: dict):
+    """
+    Endpoint simple para registrar un reporte manual desde el Add-on.
+    Se puede reemplazar más adelante por guardado en PostgreSQL.
+    """
+    print("📩 Reporte de phishing recibido:", data)
+    return {"status": "ok", "message": "Reporte registrado"}
+
+# Endpoint para marcar un correo como seguro desde el Add-on
+@app.post("/gmail/safe")
+async def mark_safe(data: dict):
+    """
+    Endpoint simple para registrar que un usuario marcó un correo como seguro.
+    """
+    print("📩 Marcado como seguro:", data)
+    return {"status": "ok", "message": "Marcado como seguro registrado"}
+
+
 # Redirigir la ruta raíz hacia la documentación Swagger
 @app.get("/", include_in_schema=False)
 async def redirect_to_docs():
