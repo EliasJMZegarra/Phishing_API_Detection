@@ -173,3 +173,49 @@ async def global_stats(
             "phishing_ratio": f"{(phishing / len(all_preds) * 100):.2f}%" if all_preds else "0%",
         }
     }
+
+# ============================================================
+# 6. Últimas actividades (correos + predicciones)
+# ============================================================
+@router.get("/stats/activity")
+async def recent_activity(
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+    emails_service: EmailsService = Depends(),
+    pred_service: PrediccionesService = Depends()
+):
+    """
+    Retorna actividad reciente combinada del sistema:
+    - Últimos correos almacenados
+    - Últimas predicciones realizadas
+    """
+
+    emails = await emails_service.repo.list_all(db)
+    preds = await pred_service.repo.list_all(db)
+
+    # Ordenar por fecha (descendente)
+    emails_sorted = sorted(emails, key=lambda e: e.received_date, reverse=True)
+    preds_sorted = sorted(preds, key=lambda p: p.created_at, reverse=True)
+
+    return {
+        "status": "ok",
+        "recent_emails": [
+            {
+                "id": e.id,
+                "subject": e.subject,
+                "sender": e.sender,
+                "received_date": e.received_date
+            }
+            for e in emails_sorted[:limit]
+        ],
+        "recent_predictions": [
+            {
+                "id": p.id,
+                "email_id": p.email_id,
+                "prediccion": p.prediccion,
+                "risk_level": p.risk_level,
+                "created_at": p.created_at,
+            }
+            for p in preds_sorted[:limit]
+        ]
+    }
