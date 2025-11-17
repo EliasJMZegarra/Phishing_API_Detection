@@ -52,6 +52,6 @@ rsa==4.9.1
 cachetools==5.5.0
 SQLAlchemy==2.0.28
 asyncpg==0.29.0
-psycopg2-binary==2.9.7
+# psycopg2-binary==2.9.7
 
 
