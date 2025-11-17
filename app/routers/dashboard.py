@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.database import get_db
-from app.services.users_service import UsersService
-from app.services.emails_service import EmailsService
-from app.services.predicciones_service import PrediccionesService
+from app.services.emails_service import EmailsService, get_emails_service
+from app.services.users_service import UsersService, get_users_service
+from app.services.predicciones_service import PrediccionesService, get_predicciones_service
+
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -15,8 +15,8 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 async def get_email_by_id(
     email_id: int,
     db: AsyncSession = Depends(get_db),
-    emails_service: EmailsService = Depends(),
-):
+    emails_service: EmailsService = Depends(get_emails_service),
+) -> dict:
     """
     Retorna la información almacenada de un correo específico.
     Ideal para que el dashboard muestre detalles del correo.
@@ -46,8 +46,8 @@ async def get_email_by_id(
 async def get_predictions_for_email(
     email_id: int,
     db: AsyncSession = Depends(get_db),
-    pred_service: PrediccionesService = Depends()
-):
+    pred_service: PrediccionesService = Depends(get_predicciones_service)
+) -> dict:
     """
     Retorna todas las predicciones asociadas a ese correo.
     Muy útil para ver historial de clasificaciones y niveles de riesgo.
@@ -76,8 +76,8 @@ async def get_predictions_for_email(
 async def get_user_info(
     email: str,
     db: AsyncSession = Depends(get_db),
-    users_service: UsersService = Depends()
-):
+    users_service: UsersService = Depends(get_users_service)
+) -> dict:
     """
     Devuelve los datos del usuario que reportó o analizó correos.
     """
@@ -105,8 +105,8 @@ async def list_emails(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
-    emails_service: EmailsService = Depends(),
-):
+    emails_service: EmailsService = Depends(get_emails_service),
+) -> dict:
     """
     Lista correos almacenados en la BD.
     Ideal para tablas grandes del panel administrativo.
@@ -143,9 +143,9 @@ async def list_emails(
 @router.get("/stats/global")
 async def global_stats(
     db: AsyncSession = Depends(get_db),
-    emails_service: EmailsService = Depends(),
-    pred_service: PrediccionesService = Depends()
-):
+    emails_service: EmailsService = Depends(get_emails_service),
+    pred_service: PrediccionesService = Depends(get_predicciones_service)
+) -> dict:
     """
     Retorna estadísticas principales:
     - Total de correos
@@ -181,9 +181,9 @@ async def global_stats(
 async def recent_activity(
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    emails_service: EmailsService = Depends(),
-    pred_service: PrediccionesService = Depends()
-):
+    emails_service: EmailsService = Depends(get_emails_service),
+    pred_service: PrediccionesService = Depends(get_predicciones_service)
+) -> dict:
     """
     Retorna actividad reciente combinada del sistema:
     - Últimos correos almacenados

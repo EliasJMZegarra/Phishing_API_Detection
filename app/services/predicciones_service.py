@@ -7,7 +7,7 @@ class PrediccionesService:
     def __init__(self, repo: PrediccionesRepository = PrediccionesRepository()):
         self.repo = repo
 
-    async def save_prediction(self, db: AsyncSession, data: dict) -> Prediccion:
+    async def save_prediction(self, db: AsyncSession, data: dict):
         return await self.repo.save_prediction(db, data)
 
     async def get_predictions_by_email(self, db: AsyncSession, email_id: int):
@@ -15,3 +15,6 @@ class PrediccionesService:
 
     async def list_all(self, db: AsyncSession):
         return await self.repo.list_all(db)
+
+def get_predicciones_service():
+    return PrediccionesService()

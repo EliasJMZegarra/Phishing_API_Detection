@@ -10,8 +10,10 @@ LOCAL_ENV = os.getenv("RENDER", "false").lower() == "false"  # Detecta entorno l
 TOKEN_PATH = "app/credentials/token.json"
 
 # === Configuración de scopes ===
-if os.getenv("GMAIL_SCOPES"):
-    SCOPES = os.getenv("GMAIL_SCOPES").split()
+scopes_env = os.getenv("GMAIL_SCOPES")
+
+if scopes_env:
+    SCOPES = scopes_env.split()
 else:
     SCOPES = [
         "https://www.googleapis.com/auth/gmail.addons.execute",

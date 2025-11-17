@@ -7,13 +7,13 @@ class UsersService:
     def __init__(self, repo: UsersRepository = UsersRepository()):
         self.repo = repo
 
-    async def create_user(self, db: AsyncSession, email: str) -> Usuario:
+    async def create_user(self, db: AsyncSession, email: str):
         return await self.repo.create_user(db, email)
 
-    async def get_user_by_email(self, db: AsyncSession, email: str) -> Usuario | None:
+    async def get_user_by_email(self, db: AsyncSession, email: str):
         return await self.repo.get_user_by_email(db, email)
 
-    async def create_if_not_exists(self, db: AsyncSession, email: str) -> Usuario:
+    async def create_if_not_exists(self, db: AsyncSession, email: str):
         existing = await self.repo.get_user_by_email(db, email)
         if existing:
             return existing
@@ -21,3 +21,6 @@ class UsersService:
    
     async def list_all(self, db: AsyncSession):
         return await self.repo.list_all(db)
+
+def get_users_service():
+    return UsersService()

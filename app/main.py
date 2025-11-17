@@ -13,9 +13,9 @@ import numpy as np
 from typing import Optional
 from sentence_transformers import SentenceTransformer
 from app.oauth import router as oauth_router
-from app.services.users_service import UsersService
-from app.services.emails_service import EmailsService
-from app.services.predicciones_service import PrediccionesService
+from app.services.users_service import UsersService, get_users_service
+from app.services.emails_service import EmailsService, get_emails_service
+from app.services.predicciones_service import PrediccionesService, get_predicciones_service
 from app.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.routers.dashboard import router as dashboard_router
@@ -256,9 +256,9 @@ def classify_email(message_id: Optional[str] = None):
 async def report_phishing(
     data: dict,
     db=Depends(get_db),
-    users_service: UsersService = Depends(),
-    emails_service: EmailsService = Depends(),
-    pred_service: PrediccionesService = Depends(),
+    users_service: UsersService = Depends(get_users_service),
+    emails_service: EmailsService = Depends(get_emails_service),
+    pred_service: PrediccionesService = Depends(get_predicciones_service),
 ):
     """
     Guarda un reporte explícito de phishing desde el Add-on.
@@ -303,11 +303,12 @@ async def report_phishing(
 @app.post("/gmail/safe")
 async def mark_safe(
     data: dict,
-    db=Depends(get_db),
-    users_service: UsersService = Depends(),
-    emails_service: EmailsService = Depends(),
-    pred_service: PrediccionesService = Depends(),
+    db: AsyncSession = Depends(get_db),
+    users_service: UsersService = Depends(get_users_service),
+    emails_service: EmailsService = Depends(get_emails_service),
+    pred_service: PrediccionesService = Depends(get_predicciones_service),
 ):
+
     """
     Guarda un reporte explícito de correo seguro desde el Add-on.
     """
