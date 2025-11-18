@@ -18,7 +18,10 @@ def get_gmail_service():
     scopes = [
         "https://www.googleapis.com/auth/gmail.addons.execute",
         "https://www.googleapis.com/auth/script.external_request",
-        "https://www.googleapis.com/auth/gmail.readonly"
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+        "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
+        "https://www.googleapis.com/auth/userinfo.email"
     ]
 
     # === Validar existencia de token.json ===
