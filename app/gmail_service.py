@@ -15,7 +15,7 @@ def get_gmail_service():
     token_path = "app/credentials/token.json"
     
     # === Usar EXACTAMENTE los mismos scopes que usa OAuth ===
-    scopes = [
+    SCOPES = [
         "https://www.googleapis.com/auth/gmail.addons.execute",
         "https://www.googleapis.com/auth/script.external_request",
         "https://www.googleapis.com/auth/gmail.readonly",
@@ -31,7 +31,7 @@ def get_gmail_service():
         )
 
     # === Cargar credenciales ===
-    creds = Credentials.from_authorized_user_file(token_path, scopes)
+    creds = Credentials.from_authorized_user_file(token_path, SCOPES)
 
     # === Renovar token si expiró y tiene refresh_token ===
     if creds.expired and creds.refresh_token:
