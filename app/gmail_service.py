@@ -21,7 +21,8 @@ def get_gmail_service():
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
         "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
-        "https://www.googleapis.com/auth/userinfo.email"
+        "https://www.googleapis.com/auth/userinfo.email",
+        "openid"
     ]
 
     # === Validar existencia de token.json ===

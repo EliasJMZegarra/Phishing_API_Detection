@@ -21,7 +21,8 @@ else:
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
     "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
-    "https://www.googleapis.com/auth/userinfo.email"
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid"
  ]
 
 # === Ruta y credenciales ===
@@ -57,7 +58,7 @@ def authorize():
 
 # === Endpoint /oauth2callback ===
 @router.get("/oauth2callback")
-async def oauth2callback(request: Request):
+def oauth2callback(request: Request):
     try:
         flow = Flow.from_client_secrets_file(
            CLIENT_SECRET_FILE,
