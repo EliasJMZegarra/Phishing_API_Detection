@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.emails_service import EmailsService, get_emails_service
 from app.services.users_service import UsersService, get_users_service
@@ -12,16 +12,16 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 # 1. Obtener información detallada de un email por ID
 # ============================================================
 @router.get("/emails/{email_id}")
-async def get_email_by_id(
+def get_email_by_id(
     email_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
 ) -> dict:
     """
     Retorna la información almacenada de un correo específico.
     Ideal para que el dashboard muestre detalles del correo.
     """
-    record = await emails_service.get_email_by_id(db, email_id)
+    record = emails_service.get_email_by_id(db, email_id)
     if not record:
         return {"status": "error", "message": "Correo no encontrado"}
 
@@ -43,16 +43,16 @@ async def get_email_by_id(
 # 2. Obtener predicciones asociadas a un email
 # ============================================================
 @router.get("/emails/{email_id}/predicciones")
-async def get_predictions_for_email(
+def get_predictions_for_email(
     email_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     pred_service: PrediccionesService = Depends(get_predicciones_service)
 ) -> dict:
     """
     Retorna todas las predicciones asociadas a ese correo.
     Muy útil para ver historial de clasificaciones y niveles de riesgo.
     """
-    preds = await pred_service.get_predictions_by_email(db, email_id)
+    preds = pred_service.get_predictions_by_email(db, email_id)
 
     return {
         "status": "ok",
@@ -73,15 +73,15 @@ async def get_predictions_for_email(
 # 3. Obtener información de usuario por correo electrónico
 # ============================================================
 @router.get("/usuarios/{email}")
-async def get_user_info(
+def get_user_info(
     email: str,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     users_service: UsersService = Depends(get_users_service)
 ) -> dict:
     """
     Devuelve los datos del usuario que reportó o analizó correos.
     """
-    usuario = await users_service.get_user_by_email(db, email)
+    usuario = users_service.get_user_by_email(db, email)
     if not usuario:
         return {"status": "error", "message": "Usuario no encontrado"}
 
@@ -101,10 +101,10 @@ async def get_user_info(
 # 4. Listado general de correos (paginado)
 # ============================================================
 @router.get("/emails")
-async def list_emails(
+def list_emails(
     limit: int = 50,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
 ) -> dict:
     """
@@ -116,7 +116,7 @@ async def list_emails(
     # Lo implementaremos luego, pero por ahora devolvemos todos.
     # Esto no rompe nada.
 
-    all_emails = await emails_service.repo.list_all(db)
+    all_emails = emails_service.repo.list_all(db)
 
     sliced = all_emails[offset : offset + limit]
 
@@ -141,8 +141,8 @@ async def list_emails(
 # 5. Estadísticas globales para el dashboard
 # ============================================================
 @router.get("/stats/global")
-async def global_stats(
-    db: AsyncSession = Depends(get_db),
+def global_stats(
+    db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
     pred_service: PrediccionesService = Depends(get_predicciones_service)
 ) -> dict:
@@ -155,13 +155,13 @@ async def global_stats(
     """
 
     # Obtener todos los correos
-    all_emails = await emails_service.repo.list_all(db)
+    all_emails = emails_service.repo.list_all(db)
 
     # Obtener todas las predicciones
-    all_preds = await pred_service.repo.list_all(db)
+    all_preds = pred_service.repo.list_all(db)
 
-    phishing = sum(1 for p in all_preds if p.prediccion == "phishing")
-    legit = sum(1 for p in all_preds if p.prediccion == "legitimate")
+    phishing = sum(1 for p in all_preds if p.prediccion == "phishing") # type: ignore
+    legit = sum(1 for p in all_preds if p.prediccion == "legitimate") # type: ignore
 
     return {
         "status": "ok",
@@ -178,9 +178,9 @@ async def global_stats(
 # 6. Últimas actividades (correos + predicciones)
 # ============================================================
 @router.get("/stats/activity")
-async def recent_activity(
+def recent_activity(
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
     pred_service: PrediccionesService = Depends(get_predicciones_service)
 ) -> dict:
@@ -190,8 +190,8 @@ async def recent_activity(
     - Últimas predicciones realizadas
     """
 
-    emails = await emails_service.repo.list_all(db)
-    preds = await pred_service.repo.list_all(db)
+    emails = emails_service.repo.list_all(db)
+    preds = pred_service.repo.list_all(db)
 
     # Ordenar por fecha (descendente)
     emails_sorted = sorted(emails, key=lambda e: e.received_date, reverse=True)

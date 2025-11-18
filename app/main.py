@@ -17,7 +17,7 @@ from app.services.users_service import UsersService, get_users_service
 from app.services.emails_service import EmailsService, get_emails_service
 from app.services.predicciones_service import PrediccionesService, get_predicciones_service
 from app.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from app.routers.dashboard import router as dashboard_router
 
 
@@ -253,7 +253,7 @@ def classify_email(message_id: Optional[str] = None):
 
 # Endpoints para reportes de phishing manuales desde el Add-on
 @app.post("/gmail/report")
-async def report_phishing(
+def report_phishing(
     data: dict,
     db=Depends(get_db),
     users_service: UsersService = Depends(get_users_service),
@@ -270,7 +270,7 @@ async def report_phishing(
         return {"status": "error", "message": "Faltan parámetros obligatorios."}
 
     # 1. Registrar usuario si no existe
-    usuario = await users_service.create_if_not_exists(db, user_email)
+    usuario = users_service.create_if_not_exists(db, user_email)
 
     # 2. Obtener el correo desde Gmail
     service = get_gmail_service()
@@ -287,10 +287,10 @@ async def report_phishing(
     }
 
     # 4. Guardar correo en BD 
-    email_record = await emails_service.save_email(db, email_data_to_save)
+    email_record = emails_service.save_email(db, email_data_to_save)
 
     # 5. Guardar predicción manual (phishing)
-    await pred_service.save_prediction(db, {
+    pred_service.save_prediction(db, {
         "email_id": email_record.id,
         "prediccion": "phishing",
         "risk_level": None,   # manual, sin probabilidad
@@ -301,9 +301,9 @@ async def report_phishing(
 
 # Endpoint para marcar un correo como seguro desde el Add-on
 @app.post("/gmail/safe")
-async def mark_safe(
+def mark_safe(
     data: dict,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     users_service: UsersService = Depends(get_users_service),
     emails_service: EmailsService = Depends(get_emails_service),
     pred_service: PrediccionesService = Depends(get_predicciones_service),
@@ -319,7 +319,7 @@ async def mark_safe(
         return {"status": "error", "message": "Faltan parámetros obligatorios."}
 
     # 1. Registrar usuario si no existe
-    usuario = await users_service.create_if_not_exists(db, user_email)
+    usuario = users_service.create_if_not_exists(db, user_email)
 
     # 2. Obtener el correo desde Gmail
     service = get_gmail_service()
@@ -336,10 +336,10 @@ async def mark_safe(
     }
 
     # 4. Guardar correo
-    email_record = await emails_service.save_email(db, email_data_to_save)
+    email_record = emails_service.save_email(db, email_data_to_save)
 
     # 5. Guardar predicción manual (legitimate)
-    await pred_service.save_prediction(db, {
+    pred_service.save_prediction(db, {
         "email_id": email_record.id,
         "prediccion": "legitimate",
         "risk_level": None,
@@ -350,5 +350,5 @@ async def mark_safe(
 
 # Redirigir la ruta raíz hacia la documentación Swagger
 @app.get("/", include_in_schema=False)
-async def redirect_to_docs():
+def redirect_to_docs():
     return RedirectResponse(url="/docs")

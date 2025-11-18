@@ -16,10 +16,12 @@ if scopes_env:
     SCOPES = scopes_env.split()
 else:
     SCOPES = [
-        "https://www.googleapis.com/auth/gmail.addons.execute",
-        "https://www.googleapis.com/auth/script.external_request",
-        "https://www.googleapis.com/auth/gmail.readonly"
-    ]
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata"
+ ]
 
 # === Ruta y credenciales ===
 if LOCAL_ENV:

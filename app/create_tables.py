@@ -1,10 +1,13 @@
-import asyncio
-from app.database import engine, Base
+# app/create_tables.py
 
-async def create_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("✅ Tablas creadas correctamente en PostgreSQL.")
+from app.database import engine, Base
+import app.models_sql   # <-- IMPORTANTE: activa los modelos
+
+def create_tables():
+    print("Creando tablas en PostgreSQL...")
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tablas creadas correctamente.")
 
 if __name__ == "__main__":
-    asyncio.run(create_tables())
+    create_tables()
+
