@@ -54,4 +54,7 @@ SQLAlchemy==2.0.28
 # asyncpg==0.29.0
 psycopg2-binary==2.9.7
 
+# ==== DASHBOARD ====
+streamlit==1.31.0
+plotly==5.18.0
 
