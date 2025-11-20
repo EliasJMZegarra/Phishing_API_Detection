@@ -1,4 +1,5 @@
 services:
+  # === Servicio 1: API PRINCIPAL ===
   - type: web
     name: phishing-api-detection
     env: python
@@ -12,3 +13,23 @@ services:
       python download_model.py
 
     startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
+
+   # === Servicio 2: DASHBOARD STREAMLIT ===
+  - type: web
+    name: phishing-dashboard
+    env: python
+    plan: free   
+    rootDir: Dashboard     
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.14
+
+      - key: API_URL
+        value: https://phishing-api-detection.onrender.com   
+
+    buildCommand: |
+      pip install -r requirements.txt
+
+    startCommand: "streamlit run app.py --server.port $PORT --server.address 0.0.0.0"

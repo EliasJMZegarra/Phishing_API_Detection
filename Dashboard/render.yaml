@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: phishing-dashboard
-    env: python
-    rootDir: Dashboard
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
-    pythonVersion: 3.10.14
