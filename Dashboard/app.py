@@ -13,11 +13,11 @@ st.set_page_config(
 login_flow()
 
 # Requerir que el usuario esté autenticado
-user = require_login()
+require_login()
 
-# Si el usuario está autenticado, mostrar su email arriba
-if user:
-    st.success(f"🔓 Usuario autenticado: **{user.get('email', 'Usuario') }**")
+# Mostrar usuario conectado
+user = st.session_state["user"]
+st.success(f"🔓 Usuario autenticado: **{user.get('email')}**")
 
 # Título principal
 st.title("Panel Administrativo – Phishing Detection System")
