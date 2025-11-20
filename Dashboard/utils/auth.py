@@ -81,7 +81,7 @@ def login_flow():
             st.session_state["user"] = user
 
             # Redirigir limpiando el código de la URL
-            st.query_params.clear()
+            st.experimental_set_query_params()
             st.rerun()
 
 # ----------------------------------------------------
