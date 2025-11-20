@@ -1,0 +1,8 @@
+# === CORE DASHBOARD DEPENDENCIES ===
+streamlit==1.31.0
+pandas==2.2.2
+plotly==5.18.0
+requests==2.32.3
+
+# === OPTIONAL LOCAL ENV SUPPORT ===
+python-dotenv==1.0.1
