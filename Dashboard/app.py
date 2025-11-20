@@ -1,5 +1,9 @@
 import streamlit as st
 from sections import global_stats, user_stats, timeline
+from utils.auth import login_flow, require_login, logout_button
+
+# Ejecutar flujo OAuth (revisa si hay "code" en la URL)
+login_flow()
 
 # Configuración general del Dashboard
 st.set_page_config(
@@ -7,6 +11,9 @@ st.set_page_config(
     page_icon="📊",
     layout="wide"
 )
+
+# Requerir que el usuario esté autenticado
+require_login()
 
 # Título principal
 st.title("Panel Administrativo – Phishing Detection System")
@@ -20,6 +27,9 @@ menu = st.sidebar.radio(
         "Tendencia temporal"
     )
 )
+
+# Botón de cerrar sesión
+logout_button()
 
 # Enrutamiento básico
 if menu == "Resumen global":
