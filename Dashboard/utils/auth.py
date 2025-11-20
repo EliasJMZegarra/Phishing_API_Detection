@@ -84,7 +84,7 @@ def login_flow():
             st.session_state["user_picture"] = user_info.get("picture")
 
             st.success("Autenticación exitosa. Redirigiendo...")
-            st.experimental_set_query_params()  # limpiar la URL
+            params = st.query_params
             st.rerun()
 
 
