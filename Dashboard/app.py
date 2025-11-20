@@ -2,15 +2,15 @@ import streamlit as st
 from sections import global_stats, user_stats, timeline
 from utils.auth import login_flow, require_login, logout_button
 
-# Ejecutar flujo OAuth (revisa si hay "code" en la URL)
-login_flow()
-
 # Configuración general del Dashboard
 st.set_page_config(
     page_title="Phishing Detection Dashboard",
     page_icon="📊",
     layout="wide"
 )
+
+# Ejecutar flujo OAuth 
+login_flow()
 
 # Requerir que el usuario esté autenticado
 require_login()
