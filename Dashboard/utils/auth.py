@@ -65,24 +65,35 @@ def get_user_info(access_token: str):
 # FLUJO PRINCIPAL OAuth
 # ----------------------------------------------------
 def login_flow():
+    # Si ya está autenticado NO volver a ejecutar OAuth
+    if st.session_state.get("logged_in"):
+        return
 
-    params = st.query_params  # Obtener parámetros de la URL
+    # Leer parámetros de la URL
+    params = st.query_params
 
-    if "code" in params:
-        auth_code = params["code"]
+    # Solo ejecutar si existe "code"
+    auth_code = params.get("code", None)
+    if not auth_code:
+        return  
 
-        token_data = exchange_code(auth_code)
-        access = token_data.get("access_token")
+    # Intercambiar code por tokens
+    token_data = exchange_code(auth_code)
+    access = token_data.get("access_token")
 
-        if access:
-            user = get_user_info(access)
+    if not access:
+        st.error("Error al obtener tokens")
+        return
 
-            st.session_state["logged_in"] = True
-            st.session_state["user"] = user
+    user = get_user_info(access)
 
-            # Redirigir limpiando el código de la URL
-            st.query_params.clear()
-            st.rerun()
+    # Guardar sesión
+    st.session_state["logged_in"] = True
+    st.session_state["user"] = user
+
+    # Limpiar URL
+    st.query_params.clear()
+    st.rerun()
 
 # ----------------------------------------------------
 # BOTÓN DE LOGIN
