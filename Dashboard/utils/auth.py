@@ -1,13 +1,13 @@
 import streamlit as st
 import requests
 import os
-import time
 from urllib.parse import urlencode
 
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 
+# Alcances mínimos para identificar al usuario
 SCOPES = ["openid", "email", "profile"]
 
 # ----------------------------------------------------
@@ -20,8 +20,8 @@ def get_login_url():
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
+        # sin "prompt=consent" para no forzar pantallas de permiso cada vez
     }
-
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
 
 # ----------------------------------------------------
@@ -35,25 +35,25 @@ def exchange_code(auth_code: str):
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
         "redirect_uri": REDIRECT_URI,
-        "grant_type": "authorization_code"
+        "grant_type": "authorization_code",
     }
 
     res = requests.post(token_url, data=data)
 
+    # Si el code es inválido / reutilizado, devolvemos None
     if res.status_code != 200:
-        st.error("Error al obtener tokens")
-        st.stop()
+        # Opcional: descomenta si quieres ver el detalle para debug
+        # st.write("Respuesta de Google:", res.status_code, res.text)
+        return None
 
     return res.json()
 
-
 # ----------------------------------------------------
-# REFRESH AUTOMÁTICO DEL ACCESS_TOKEN
+# Refresca el access_token usando refresh_token
 # ----------------------------------------------------
-def refresh_access_token():
-    refresh_token = st.session_state.get("refresh_token", None)
+def refresh_access_token(refresh_token: str):
     if not refresh_token:
-        return False  
+        return None
 
     token_url = "https://oauth2.googleapis.com/token"
     data = {
@@ -64,16 +64,10 @@ def refresh_access_token():
     }
 
     res = requests.post(token_url, data=data)
-
     if res.status_code != 200:
-        return False
+        return None
 
-    token_data = res.json()
-    st.session_state["access_token"] = token_data.get("access_token")
-    st.session_state["expires_at"] = time.time() + token_data.get("expires_in", 3600)
-
-    return True
-
+    return res.json()
 
 # ----------------------------------------------------
 # Obtiene info del usuario
@@ -85,8 +79,7 @@ def get_user_info(access_token: str):
     res = requests.get(url, headers=headers)
 
     if res.status_code != 200:
-        st.error("Error al obtener la información del usuario")
-        st.stop()
+        return None
 
     return res.json()
 
@@ -94,62 +87,79 @@ def get_user_info(access_token: str):
 # FLUJO PRINCIPAL OAuth
 # ----------------------------------------------------
 def login_flow():
-    # Si ya está autenticado, verificar expiración
-    if (
-        st.session_state.get("logged_in")
-        and st.session_state.get("access_token")
-    ):
-        expires_at = st.session_state.get("expires_at", 0)
-
-        # Si expira en menos de 60 segundos → refrescar
-        if time.time() > expires_at - 60:
-            refreshed = refresh_access_token()
-            if not refreshed:
-                # No se pudo refrescar, cerrar sesión segura
-                st.session_state.clear()
-                st.rerun()
+    # 0) Si ya hay sesión válida, no hacemos nada
+    if st.session_state.get("logged_in") and st.session_state.get("access_token"):
         return
 
-    # Flujo de autenticación desde cero
+    # 1) Si tenemos refresh_token pero perdimos el access_token,
+    #    intentamos renovarlo silenciosamente.
+    refresh_token = st.session_state.get("refresh_token")
+    if refresh_token and not st.session_state.get("access_token"):
+        token_data = refresh_access_token(refresh_token)
+        if token_data and token_data.get("access_token"):
+            access_token = token_data["access_token"]
+            st.session_state["access_token"] = access_token
+            st.session_state["id_token"] = token_data.get("id_token")
+            st.session_state["expires_in"] = token_data.get("expires_in")
+
+            user = get_user_info(access_token)
+            if user:
+                st.session_state["logged_in"] = True
+                st.session_state["user"] = user
+                return
+        # Si el refresh falla, continuamos y forzamos login normal.
+
+    # 2) Leer parámetros de la URL (para capturar ?code=)
     params = st.query_params
-
-    # Solo ejecutar si existe "code"
     auth_code = params.get("code", None)
+
+    # Si no hay code, salimos: el usuario verá el botón en require_login()
     if not auth_code:
-        return  
-
-    # Intercambiar code por tokens
-    token_data = exchange_code(auth_code)
-    access = token_data.get("access_token")
-    
-    # Guardar tokens en sesión
-    st.session_state["access_token"] = token_data.get("access_token")
-    st.session_state["refresh_token"] = token_data.get("refresh_token")
-    st.session_state["id_token"] = token_data.get("id_token")
-
-    # Evitar perder refresh_token si Google no lo envía en nuevas autenticaciones
-    if not st.session_state["refresh_token"]:
-        st.session_state["refresh_token"] = token_data.get("refresh_token")
-    
-    # Calcular expiración exacta
-    expires_in = token_data.get("expires_in", 3600)
-    st.session_state["expires_in"] = expires_in
-    st.session_state["expires_at"] = time.time() + expires_in
-
-    if not access:
-        st.error("Error al obtener tokens")
         return
 
-    user = get_user_info(access)
+    # 3) Intercambiar code por tokens
+    token_data = exchange_code(auth_code)
 
-    # Guardar sesión
+    # Si el code ya caducó o no es válido, limpiamos el parámetro
+    # y dejamos que el usuario vuelva a iniciar sesión sin mostrar error rojo.
+    if not token_data or not token_data.get("access_token"):
+        if "code" in st.query_params:
+            st.query_params.pop("code")
+        return
+
+    access_token = token_data["access_token"]
+
+    # Guardar tokens en sesión
+    st.session_state["access_token"] = access_token
+
+    # Guardar / preservar refresh_token
+    new_refresh = token_data.get("refresh_token")
+    if new_refresh:
+        st.session_state["refresh_token"] = new_refresh
+    elif "refresh_token" not in st.session_state:
+        st.session_state["refresh_token"] = None
+
+    st.session_state["id_token"] = token_data.get("id_token")
+    st.session_state["expires_in"] = token_data.get("expires_in")
+
+    # Obtener datos del usuario
+    user = get_user_info(access_token)
+    if not user:
+        # Algo falló: limpiamos estado y code
+        st.session_state.clear()
+        if "code" in st.query_params:
+            st.query_params.pop("code")
+        return
+
+    # Marcar sesión como autenticada
     st.session_state["logged_in"] = True
     st.session_state["user"] = user
 
-    # Limpiar URL
+    # 4) Limpiar la URL (quitar ?code=) y recargar sin parámetro
     if "code" in st.query_params:
         st.query_params.pop("code")
     st.rerun()
+
 
 # ----------------------------------------------------
 # BOTÓN DE LOGIN
@@ -170,7 +180,7 @@ def login_button():
             </button>
         </a>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 # ----------------------------------------------------
@@ -180,7 +190,7 @@ def require_login():
     if not st.session_state.get("logged_in"):
         st.warning("Debes iniciar sesión para acceder al dashboard.")
         login_button()
-        st.stop()  
+        st.stop()
 
 # ----------------------------------------------------
 # LOGOUT
@@ -189,3 +199,4 @@ def logout_button():
     if st.sidebar.button("Cerrar sesión"):
         st.session_state.clear()
         st.rerun()
+
