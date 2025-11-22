@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import os
+import time
 from urllib.parse import urlencode
 
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
@@ -19,7 +20,6 @@ def get_login_url():
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
-        "prompt": "consent"
     }
 
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
@@ -46,6 +46,35 @@ def exchange_code(auth_code: str):
 
     return res.json()
 
+
+# ----------------------------------------------------
+# REFRESH AUTOMÁTICO DEL ACCESS_TOKEN
+# ----------------------------------------------------
+def refresh_access_token():
+    refresh_token = st.session_state.get("refresh_token", None)
+    if not refresh_token:
+        return False  
+
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "refresh_token": refresh_token,
+        "grant_type": "refresh_token",
+    }
+
+    res = requests.post(token_url, data=data)
+
+    if res.status_code != 200:
+        return False
+
+    token_data = res.json()
+    st.session_state["access_token"] = token_data.get("access_token")
+    st.session_state["expires_at"] = time.time() + token_data.get("expires_in", 3600)
+
+    return True
+
+
 # ----------------------------------------------------
 # Obtiene info del usuario
 # ----------------------------------------------------
@@ -65,11 +94,23 @@ def get_user_info(access_token: str):
 # FLUJO PRINCIPAL OAuth
 # ----------------------------------------------------
 def login_flow():
-    # Si ya está autenticado NO volver a ejecutar OAuth
-    if st.session_state.get("logged_in"):
+    # Si ya está autenticado, verificar expiración
+    if (
+        st.session_state.get("logged_in")
+        and st.session_state.get("access_token")
+    ):
+        expires_at = st.session_state.get("expires_at", 0)
+
+        # Si expira en menos de 60 segundos → refrescar
+        if time.time() > expires_at - 60:
+            refreshed = refresh_access_token()
+            if not refreshed:
+                # No se pudo refrescar, cerrar sesión segura
+                st.session_state.clear()
+                st.rerun()
         return
 
-    # Leer parámetros de la URL
+    # Flujo de autenticación desde cero
     params = st.query_params
 
     # Solo ejecutar si existe "code"
@@ -80,6 +121,20 @@ def login_flow():
     # Intercambiar code por tokens
     token_data = exchange_code(auth_code)
     access = token_data.get("access_token")
+    
+    # Guardar tokens en sesión
+    st.session_state["access_token"] = token_data.get("access_token")
+    st.session_state["refresh_token"] = token_data.get("refresh_token")
+    st.session_state["id_token"] = token_data.get("id_token")
+
+    # Evitar perder refresh_token si Google no lo envía en nuevas autenticaciones
+    if not st.session_state["refresh_token"]:
+        st.session_state["refresh_token"] = token_data.get("refresh_token")
+    
+    # Calcular expiración exacta
+    expires_in = token_data.get("expires_in", 3600)
+    st.session_state["expires_in"] = expires_in
+    st.session_state["expires_at"] = time.time() + expires_in
 
     if not access:
         st.error("Error al obtener tokens")
@@ -92,7 +147,8 @@ def login_flow():
     st.session_state["user"] = user
 
     # Limpiar URL
-    st.query_params.clear()
+    if "code" in st.query_params:
+        st.query_params.pop("code")
     st.rerun()
 
 # ----------------------------------------------------
