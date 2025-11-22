@@ -61,6 +61,7 @@ def get_login_url():
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
+        "prompt": "consent"
         
     }
 
