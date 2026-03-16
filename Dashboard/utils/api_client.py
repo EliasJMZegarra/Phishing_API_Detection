@@ -2,8 +2,10 @@ import requests
 import os
 
 # URL base de la API en Render
-API_BASE_URL = os.getenv("API_BASE_URL", "https://phishing-api-detection.onrender.com")
-
+API_BASE_URL = (
+    os.getenv("API_URL")
+    or "https://phishing-api-detection.onrender.com"
+)
 # ---------------------------
 #   Funciones de conexión
 # ---------------------------
@@ -18,8 +20,10 @@ def _get(endpoint: str):
 
         if response.status_code != 200:
             return {"error": f"HTTP {response.status_code}", "details": response.text}
-
-        return response.json()
+        try:
+            return response.json()
+        except Exception:
+            return {"error": "Respuesta no JSON", "details": response.text}
 
     except Exception as e:
         return {"error": str(e)}

@@ -3,47 +3,50 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import base64
+import json
 from email import message_from_bytes
 import os
 import re
 
-def get_gmail_service():
-    """
-    Crea y devuelve una instancia autenticada del servicio Gmail.
-    Si el token ha expirado, lo renueva automáticamente usando el refresh_token.
-    """
-    token_path = "app/credentials/token.json"
-    
-    # === Usar EXACTAMENTE los mismos scopes que usa OAuth ===
-    SCOPES = [
-        "https://www.googleapis.com/auth/gmail.addons.execute",
-        "https://www.googleapis.com/auth/script.external_request",
-        "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
-        "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
-        "https://www.googleapis.com/auth/userinfo.email",
-        "openid"
-    ]
+ # === Usar EXACTAMENTE los mismos scopes que usa OAuth ===
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "openid"
+]
 
-    # === Validar existencia de token.json ===
-    if not os.path.exists(token_path):
+def get_gmail_service_for_user(db, user_id: int, tokens_service):
+    """
+    Crea y devuelve una instancia autenticada del servicio Gmail para un usuario específico.
+    Lee credenciales desde PostgreSQL (oauth_tokens.credentials_json), refresca si expira y persiste el JSON actualizado.
+    """
+    row = tokens_service.get_by_user_id(db, user_id)
+    if not row:
         raise FileNotFoundError(
-            "⚠️ token.json no existe. Debe completar /authorize primero."
+            "⚠️ Este usuario no tiene credenciales OAuth guardadas. Debe completar /authorize primero."
         )
 
-    # === Cargar credenciales ===
-    creds = Credentials.from_authorized_user_file(token_path, SCOPES)
+    stored_dict = json.loads(row.credentials_json)
+    creds = Credentials.from_authorized_user_info(stored_dict, SCOPES)
 
-    # === Renovar token si expiró y tiene refresh_token ===
+    # Refrescar si expiró
     if creds.expired and creds.refresh_token:
         creds.refresh(Request())
-        with open(token_path, "w") as token_file:
-            token_file.write(creds.to_json())
+        new_dict = json.loads(creds.to_json())
 
-    # === Crear servicio Gmail ===
+        # Preservar refresh_token si el JSON nuevo no lo trae
+        if not new_dict.get("refresh_token") and stored_dict.get("refresh_token"):
+            new_dict["refresh_token"] = stored_dict["refresh_token"]
+
+        tokens_service.upsert(db, user_id, json.dumps(new_dict))
+
     service = build("gmail", "v1", credentials=creds)
     return service
-
 
 def get_email_details(service, msg_id):
     """

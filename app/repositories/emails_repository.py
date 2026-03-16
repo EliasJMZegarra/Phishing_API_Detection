@@ -6,6 +6,14 @@ from app.models_sql.tables import Email
 class EmailsRepository:
     def save_email(self, db: Session, data: dict):
         # data se espera con claves: user_id, message_id, subject, sender, date, body
+        user_id = int(data["user_id"])
+        message_id = str(data["message_id"])
+
+        q = select(Email).where(Email.user_id == user_id, Email.message_id == message_id)
+        existing = db.execute(q).scalars().first()
+        if existing:
+            return existing
+        
         new_email = Email(**data)
         db.add(new_email)
         db.commit()
