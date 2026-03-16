@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, TIMESTAMP, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -23,10 +23,11 @@ class Usuario(Base):
 # ============================================================
 class Email(Base):
     __tablename__ = "emails"
+    __table_args__ = (UniqueConstraint("user_id", "message_id", name="uq_user_message"),)
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("usuarios.id", ondelete="CASCADE"))
-    message_id = Column(String(255), unique=True, nullable=False)
+    message_id = Column(String(255), nullable=False)
     subject = Column(Text, nullable=True)
     sender = Column(String(255), nullable=True)
     body = Column(Text, nullable=True)

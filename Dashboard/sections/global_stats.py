@@ -7,12 +7,23 @@ def render():
 
     data = get_global_stats()
 
-    if "error" in data:
-        st.error(f"Error al obtener datos: {data['error']}")
+    if not isinstance(data, dict):
+        st.error("Error: respuesta inválida del backend.")
+        st.write(data)
         return
 
-    stats = data["statistics"]
-
+    if data.get("error"):
+        st.error(f"Error al obtener datos: {data['error']}")
+        if data.get("details"):
+            st.code(data["details"])
+        return
+    
+    stats = data.get("statistics")
+    if not isinstance(stats, dict):
+        st.error("Error: la API no devolvió 'statistics' con el formato esperado.")
+        st.json(data)
+        return
+    
     # KPI Cards
     col1, col2, col3, col4 = st.columns(4)
 

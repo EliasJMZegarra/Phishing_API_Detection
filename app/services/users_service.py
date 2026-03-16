@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.repositories.users_repository import UsersRepository
 from app.models_sql.tables import Usuario
 
@@ -13,7 +14,7 @@ class UsersService:
     def get_user_by_email(self, db: Session, email: str):
         return self.repo.get_user_by_email(db, email)
 
-    def create_if_not_exists(self, db: Session, email: str):
+    def create_if_not_exists(self, db: Session, email: str)-> Usuario:
         existing = self.repo.get_user_by_email(db, email)
         if existing:
             return existing
