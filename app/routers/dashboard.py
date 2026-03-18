@@ -1,12 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter,Request,HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.services.emails_service import EmailsService, get_emails_service
 from app.services.users_service import UsersService, get_users_service
 from app.services.predicciones_service import PrediccionesService, get_predicciones_service
-
+from app.models_sql.tables import Usuario
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+
+def _get_current_user(db: Session, request: Request) -> Usuario:
+    email = request.headers.get("X-User-Email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Falta X-User-Email (usuario no autenticado).")
+
+    usuario = db.query(Usuario).filter(Usuario.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=403, detail="Usuario no registrado en el sistema.")
+    return usuario
+
+def _is_admin(usuario: Usuario) -> bool:
+    return (getattr(usuario, "role", "user") or "user") == "admin"
 
 # ============================================================
 # 1. Obtener información detallada de un email por ID
@@ -102,22 +115,20 @@ def get_user_info(
 # ============================================================
 @router.get("/emails")
 def list_emails(
+    request: Request,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
 ) -> dict:
-    """
-    Lista correos almacenados en la BD.
-    Ideal para tablas grandes del panel administrativo.
-    """
+    usuario = _get_current_user(db, request)
 
-    # Nota: el repositorio todavía no tiene un método paginado.
-    # Lo implementaremos luego, pero por ahora devolvemos todos.
-    # Esto no rompe nada.
-
-    all_emails = emails_service.repo.list_all(db)
-
+    if _is_admin(usuario):
+        all_emails = emails_service.repo.list_all(db)
+    else:
+        user_id_int = int(getattr(usuario, "id"))
+        all_emails = emails_service.repo.list_by_user_id(db, user_id_int)
+    
     sliced = all_emails[offset : offset + limit]
 
     return {
@@ -142,6 +153,7 @@ def list_emails(
 # ============================================================
 @router.get("/stats/global")
 def global_stats(
+    request: Request,
     db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
     pred_service: PrediccionesService = Depends(get_predicciones_service)
@@ -154,23 +166,29 @@ def global_stats(
     - Últimos movimientos
     """
 
-    # Obtener todos los correos
-    all_emails = emails_service.repo.list_all(db)
+    usuario = _get_current_user(db, request)
 
-    # Obtener todas las predicciones
-    all_preds = pred_service.repo.list_all(db)
-
-    phishing = sum(1 for p in all_preds if p.prediccion == "phishing") # type: ignore
-    legit = sum(1 for p in all_preds if p.prediccion == "legitimate") # type: ignore
+    if _is_admin(usuario):
+        total_emails = emails_service.repo.count_all(db)
+        counts = pred_service.repo.count_all(db)
+        
+    else:
+        user_id_int = int(getattr(usuario, "id"))
+        total_emails = emails_service.repo.count_by_user_id(db, user_id_int)
+        counts = pred_service.repo.count_by_user_id(db, user_id_int)
+        
+    phishing = counts.get("phishing", 0)
+    legit = counts.get("legitimate", 0)
+    total_preds = int(sum(counts.values()))
 
     return {
         "status": "ok",
         "statistics": {
-            "total_emails": len(all_emails),
-            "total_predictions": len(all_preds),
+            "total_emails": total_emails,
+            "total_predictions": total_preds,
             "phishing": phishing,
             "legitimate": legit,
-            "phishing_ratio": f"{(phishing / len(all_preds) * 100):.2f}%" if all_preds else "0%",
+            "phishing_ratio": f"{(phishing / total_preds * 100):.2f}%" if total_preds else "0%",
         }
     }
 
@@ -179,6 +197,7 @@ def global_stats(
 # ============================================================
 @router.get("/stats/activity")
 def recent_activity(
+    request: Request,
     limit: int = 20,
     db: Session = Depends(get_db),
     emails_service: EmailsService = Depends(get_emails_service),
@@ -190,8 +209,15 @@ def recent_activity(
     - Últimas predicciones realizadas
     """
 
-    emails = emails_service.repo.list_all(db)
-    preds = pred_service.repo.list_all(db)
+    usuario = _get_current_user(db, request)
+
+    if _is_admin(usuario):
+        emails = emails_service.repo.list_all(db)
+        preds = pred_service.repo.list_all(db)
+    else:
+        user_id_int = int(getattr(usuario, "id"))
+        emails = emails_service.repo.list_by_user_id(db, user_id_int)
+        preds = pred_service.repo.list_by_user_id(db, user_id_int)
 
     # Ordenar por fecha (descendente)
     emails_sorted = sorted(emails, key=lambda e: e.received_date, reverse=True)
