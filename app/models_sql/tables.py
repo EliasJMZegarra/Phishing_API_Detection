@@ -14,7 +14,7 @@ class Usuario(Base):
     google_id = Column(String(255), nullable=True)
     name = Column(String(255), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-
+    role = Column(String(20), nullable=False, server_default="user")  # 'user' o 'admin'
     emails = relationship("Email", back_populates="usuario")
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from app.models_sql.tables import Email
 
@@ -32,4 +32,22 @@ class EmailsRepository:
         query = select(Email).order_by(Email.received_date.desc())
         result = db.execute(query)
         return result.scalars().all()
+    
+    def list_by_user_id(self, db: Session, user_id: int):
+        query = (
+            select(Email)
+            .where(Email.user_id == user_id)
+            .order_by(Email.received_date.desc())
+        )
+        result = db.execute(query)
+        return result.scalars().all()
+    
+    def count_all(self, db: Session) -> int:
+        q = select(func.count(Email.id))
+        return int(db.execute(q).scalar() or 0)
+
+    def count_by_user_id(self, db: Session, user_id: int) -> int:
+        q = select(func.count(Email.id)).where(Email.user_id == user_id)
+        return int(db.execute(q).scalar() or 0)
+
 

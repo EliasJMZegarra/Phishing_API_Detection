@@ -1,5 +1,6 @@
 import requests
 import os
+import streamlit as st
 
 # URL base de la API en Render
 API_BASE_URL = (
@@ -16,7 +17,15 @@ def _get(endpoint: str):
     """
     try:
         url = f"{API_BASE_URL}{endpoint}"
-        response = requests.get(url, timeout=10)
+        # Email del usuario autenticado en el dashboard
+        user = st.session_state.get("user") or {}
+        email = user.get("email")
+
+        headers = {}
+        if email:
+            headers["X-User-Email"] = email
+        
+        response = requests.get(url, timeout=10, headers=headers) 
 
         if response.status_code != 200:
             return {"error": f"HTTP {response.status_code}", "details": response.text}
