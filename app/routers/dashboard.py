@@ -139,6 +139,8 @@ def list_emails(
             {
                 "id": e.id,
                 "user_id": e.user_id,
+                "user_email": e.usuario.email if e.usuario else None,
+                "user_name": (getattr(e.usuario, "name", None) if e.usuario else None),
                 "subject": e.subject,
                 "sender": e.sender,
                 "received_date": e.received_date
