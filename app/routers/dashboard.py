@@ -22,6 +22,26 @@ def _is_admin(usuario: Usuario) -> bool:
     return (getattr(usuario, "role", "user") or "user") == "admin"
 
 # ============================================================
+# 0. Endpoint de prueba para verificar roles y autenticación
+# ============================================================
+@router.get("/me")
+def me(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict:
+    usuario = _get_current_user(db, request)
+    return {
+        "status": "ok",
+        "user": {
+            "id": usuario.id,
+            "email": usuario.email,
+            "role": getattr(usuario, "role", "user"),
+            "name": getattr(usuario, "name", None),
+        }
+    }
+
+
+# ============================================================
 # 1. Obtener información detallada de un email por ID
 # ============================================================
 @router.get("/emails/{email_id}")
