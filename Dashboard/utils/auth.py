@@ -34,12 +34,7 @@ def _load_tokens_from_disk():
 
 
 def _save_tokens_to_disk(token_data: dict):
-    """Guarda los tokens en disco."""
-    try:
-        with open(TOKENS_FILE, "w", encoding="utf-8") as f:
-            json.dump(token_data, f)
-    except Exception:
-        pass
+    return
 
 
 def _clear_tokens_on_disk():
@@ -172,7 +167,7 @@ def _restore_session_from_disk():
         stored = refreshed
         access_token = stored.get("access_token")
         # Guardar de nuevo tokens actualizados
-        _save_tokens_to_disk(stored)
+        #_save_tokens_to_disk(stored)
 
     # Con access_token válido obtenemos datos del usuario
     user = get_user_info(access_token)
@@ -193,7 +188,7 @@ def login_flow():
     """
 
     # 1) Intentar restaurar sesión existente
-    _restore_session_from_disk()
+    #_restore_session_from_disk()
 
     # Si ya estamos logueados después de restaurar, no hacemos nada más
     if st.session_state.get("logged_in"):
@@ -215,7 +210,7 @@ def login_flow():
         return
 
     # Guardar en disco
-    _save_tokens_to_disk(token_data)
+    # _save_tokens_to_disk(token_data)
 
     # Obtener info de usuario
     user = get_user_info(access_token)

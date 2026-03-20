@@ -5,7 +5,10 @@ from utils.api_client import get_global_stats
 def render():
     st.header("📊 Resumen Global del Sistema")
 
-    data = get_global_stats()
+    user_email = st.session_state["user"]["email"]
+    access_token = st.session_state.get("access_token")
+
+    data = get_global_stats(user_email, access_token)
 
     if not isinstance(data, dict):
         st.error("Error: respuesta inválida del backend.")
