@@ -36,8 +36,8 @@ def render():
 
     if "error" in data:
         st.error(f"Error al obtener datos: {data['error']}")
-        if data.get("details"):
-            st.code(data["details"])
+        st.code(data.get("details", "sin detalles"))
+        st.caption(f"URL: {data.get('url', 'desconocida')}")
         return
 
     series = data.get("series", [])

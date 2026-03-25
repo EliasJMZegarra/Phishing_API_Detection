@@ -25,7 +25,12 @@ def _headers(user_email: str | None = None, access_token: str | None = None) -> 
 #   Funciones de conexión
 # ---------------------------
 
-def _get(endpoint: str, user_email: str | None = None, params: dict | None = None, access_token: str | None = None):
+def _get(
+    endpoint: str,
+    user_email: str | None = None,
+    params: dict | None = None,
+    access_token: str | None = None,
+):
     try:
         # Fallback: sacar email desde sesión si no se pasa explícitamente
         if not user_email:
@@ -35,6 +40,7 @@ def _get(endpoint: str, user_email: str | None = None, params: dict | None = Non
                 user_email = maybe_email if isinstance(maybe_email, str) else None
 
         url = f"{API_BASE_URL}{endpoint}"
+
         response = requests.get(
             url,
             params=params,
@@ -42,17 +48,35 @@ def _get(endpoint: str, user_email: str | None = None, params: dict | None = Non
             timeout=10
         )
 
+        # Si la API devuelve no-200, retornamos error + detalle completo
         if response.status_code != 200:
-            return {"error": f"HTTP {response.status_code}", "details": response.text}
+            return {
+                "error": f"HTTP {response.status_code}",
+                "status_code": response.status_code,
+                "url": response.url,  # URL final con query params
+                "details": response.text,
+                "response_headers": dict(response.headers),
+            }
 
+        # Intentar parsear JSON; si falla, devolver texto
         try:
             return response.json()
         except Exception:
-            return {"error": "Respuesta no JSON", "details": response.text}
+            return {
+                "error": "Respuesta no JSON",
+                "status_code": response.status_code,
+                "url": response.url,
+                "details": response.text,
+                "response_headers": dict(response.headers),
+            }
 
     except Exception as e:
-        return {"error": str(e)}
-
+        return {
+            "error": f"Request failed: {e}",
+            "status_code": None,
+            "url": f"{API_BASE_URL}{endpoint}",
+            "details": repr(e),
+        }
 # ---------------------------
 #   Endpoints del dashboard
 # ---------------------------
