@@ -1,10 +1,12 @@
 from fastapi import APIRouter,Request,HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func, text, Integer
+from datetime import datetime, timedelta, timezone
 from app.database import get_db
 from app.services.emails_service import EmailsService, get_emails_service
 from app.services.users_service import UsersService, get_users_service
 from app.services.predicciones_service import PrediccionesService, get_predicciones_service
-from app.models_sql.tables import Usuario
+from app.models_sql.tables import Usuario, Email, Prediccion
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -169,9 +171,26 @@ def list_emails(
         ]
     }
 
+# ============================================================
+# 5. Listado de usuarios (solo para admin)
+# ============================================================
+@router.get("/users")
+def list_users(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    usuario = _get_current_user(db, request)
+    if not _is_admin(usuario):
+        return {"status": "ok", "results": [{"email": getattr(usuario, "email", None)}]}
+
+    users = db.query(Usuario).order_by(Usuario.email.asc()).all()
+    return {
+        "status": "ok",
+        "results": [{"email": u.email} for u in users if u.email is not None and u.email.strip() != ""]
+    }
 
 # ============================================================
-# 5. Estadísticas globales para el dashboard
+# 6. Estadísticas globales para el dashboard
 # ============================================================
 @router.get("/stats/global")
 def global_stats(
@@ -215,7 +234,7 @@ def global_stats(
     }
 
 # ============================================================
-# 6. Últimas actividades (correos + predicciones)
+# 7. Últimas actividades (correos + predicciones)
 # ============================================================
 @router.get("/stats/activity")
 def recent_activity(
@@ -266,4 +285,71 @@ def recent_activity(
             }
             for p in preds_sorted[:limit]
         ]
+    }
+
+# ============================================================
+# 8. Estadísticas de predicciones a lo largo del tiempo (timeline)
+# ============================================================
+
+@router.get("/stats/timeline")
+def timeline_stats(
+    request: Request,
+    days: int = 90,
+    group_by: str = "week",  # day | week | month
+    user_email: str | None = None,
+    db: Session = Depends(get_db),
+    users_service: UsersService = Depends(get_users_service),
+):
+    usuario = _get_current_user(db, request)
+
+    if group_by not in {"day", "week", "month"}:
+        raise HTTPException(status_code=400, detail="group_by inválido. Use: day, week, month.")
+
+    # Rango temporal (UTC)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    # Base query: predicciones + email (para filtrar por user_id)
+    q = (
+        db.query(
+            func.date_trunc(group_by, Prediccion.created_at).label("bucket"),
+            func.cast(func.count(Prediccion.id), Integer).label("count"),
+            func.cast(func.sum(func.case((Prediccion.prediccion == "phishing", 1), else_=0)), Integer).label("phishing"),
+            func.cast(func.sum(func.case((Prediccion.prediccion == "legitimate", 1), else_=0)), Integer).label("legitimate"),
+        )
+        .join(Email, Prediccion.email_id == Email.id)
+        .filter(Prediccion.created_at >= since)
+    )
+
+    # Filtro por usuario:
+    # - si es admin: puede filtrar por user_email si lo envía
+    # - si no es admin: siempre se fuerza a su propio user_id
+    if _is_admin(usuario):
+        if user_email:
+            target = users_service.get_user_by_email(db, user_email)
+            if not target:
+                raise HTTPException(status_code=404, detail="user_email no existe.")
+            q = q.filter(Email.user_id == int(getattr(target, "id")))
+    else:
+        q = q.filter(Email.user_id == int(getattr(usuario, "id")))
+
+    rows = (
+        q.group_by(text("bucket"))
+         .order_by(text("bucket"))
+         .all()
+    )
+
+    return {
+        "status": "ok",
+        "days": days,
+        "group_by": group_by,
+        "user_email": user_email if _is_admin(usuario) else getattr(usuario, "email", None),
+        "series": [
+            {
+                "date": r.bucket.isoformat(),   # bucket datetime
+                "total": r.count or 0,
+                "phishing": r.phishing or 0,
+                "legitimate": r.legitimate or 0,
+            }
+            for r in rows
+        ],
     }

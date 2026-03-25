@@ -1,43 +1,58 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils.api_client import _get
+from utils.api_client import get_timeline, get_users_list
 
 def render():
     st.header("📈 Tendencia Temporal de Actividad")
 
-    emails = _get("/dashboard/emails")
+    is_admin = st.session_state.get("is_admin", False)
 
-    if "error" in emails:
-        st.error(f"Error al obtener datos: {emails['error']}")
+    # 1) Selector group_by (simple)
+    group_label = st.selectbox("Agrupar por", ["Semana", "Día", "Mes"], index=0)
+    group_by = {"Día": "day", "Semana": "week", "Mes": "month"}[group_label]
+
+    # 2) Filtro por usuario (solo admin)
+    selected_email = None
+    if is_admin:
+        users = get_users_list()
+        if "error" in users:
+            st.error(f"Error al obtener usuarios: {users['error']}")
+            return
+        results = users.get("results", [])
+        emails: list[str] = []
+        if isinstance(results, list):
+            for item in results:
+                if isinstance(item, dict):
+                    email = item.get("email")
+                    if isinstance(email, str) and email:
+                        emails.append(email)
+        options = ["(Todos)"] + emails
+        pick = st.selectbox("Filtrar por usuario (email)", options, index=0)
+        selected_email = None if pick == "(Todos)" else pick
+
+    # 3) days fijo (90)
+    data = get_timeline(group_by=group_by, days=90, user_email=selected_email)
+
+    if "error" in data:
+        st.error(f"Error al obtener datos: {data['error']}")
+        if data.get("details"):
+            st.code(data["details"])
         return
 
-    results = emails["results"]
-
-    # Convertimos a DataFrame
-    df = pd.DataFrame(results)
-
-    if df.empty:
-        st.info("No existen datos suficientes para mostrar una tendencia.")
+    series = data.get("series", [])
+    if not series:
+        st.info("No existen datos suficientes para mostrar tendencia.")
         return
 
-    # Convertir fechas → pandas datetime
-    df["received_date"] = pd.to_datetime(df["received_date"]).dt.date
-        
-    # Agrupar por fecha
-    trend = df.groupby("received_date").size().reset_index(name="conteo")
+    df = pd.DataFrame(series)
+    df["date"] = pd.to_datetime(df["date"])
 
-    fig = px.line(
-        trend,
-        x="received_date",
-        y="conteo",
-        title="Tendencia temporal de análisis",
-        labels={"received_date": "Fecha", "conteo": "Correos analizados"},
-        markers=True
-    )
+    metric = st.selectbox("Métrica", ["Total", "Phishing", "Legítimos"], index=0)
+    y = {"Total": "total", "Phishing": "phishing", "Legítimos": "legitimate"}[metric]
 
+    fig = px.line(df, x="date", y=y, markers=True, title="Tendencia temporal de análisis")
     st.plotly_chart(fig, use_container_width=True)
-    
-    # Mostrar tabla de apoyo
-    st.subheader("📋 Datos diarios")
-    st.dataframe(trend, use_container_width=True)
+
+    st.subheader("📋 Datos")
+    st.dataframe(df[["date", "total", "phishing", "legitimate"]], use_container_width=True)

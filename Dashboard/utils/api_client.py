@@ -28,10 +28,12 @@ def _headers(user_email: str | None = None, access_token: str | None = None) -> 
 def _get(endpoint: str, user_email: str | None = None, access_token: str | None = None):
     try:
         # fallback: sacar email desde sesión si no se pasa
-        if user_email is None:
-            user = st.session_state.get("user") or {}
+        user = st.session_state.get("user") or {}
+        if isinstance(user, dict):
             user_email = user.get("email")
-
+        else:
+            user_email = None    
+            
         url = f"{API_BASE_URL}{endpoint}"
         response = requests.get(url, headers=_headers(user_email, access_token), timeout=10)
 
@@ -54,16 +56,17 @@ def get_global_stats(user_email: str, access_token: str | None = None):
     """Obtiene estadísticas generales de la API."""
     return _get("/dashboard/stats/global", user_email, access_token)
 
-def get_user_stats(user_email: str, access_token: str | None = None):
-    """Obtiene ranking de usuarios más afectados."""
-    return _get("/dashboard/stats/users", user_email, access_token)
-
-def get_timeline(user_email: str, access_token: str | None = None):
-    """Obtiene la tendencia temporal del phishing."""
-    return _get("/dashboard/stats/timeline", user_email, access_token)
-
 def get_activity(user_email: str, access_token: str | None = None):
     return _get("/dashboard/stats/activity", user_email, access_token)
 
 def get_emails(user_email: str, access_token: str | None = None):
     return _get("/dashboard/emails", user_email, access_token)
+
+def get_users_list():
+    return _get("/dashboard/users")
+
+def get_timeline(group_by="week", days=90, user_email=None):
+    params = f"?group_by={group_by}&days={days}"
+    if user_email:
+        params += f"&user_email={user_email}"
+    return _get("/dashboard/stats/timeline" + params)
