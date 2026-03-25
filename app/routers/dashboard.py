@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Request,HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, Integer
+from sqlalchemy import func, text, Integer,case
 from datetime import datetime, timedelta, timezone
 from app.database import get_db
 from app.services.emails_service import EmailsService, get_emails_service
@@ -300,6 +300,13 @@ def timeline_stats(
     db: Session = Depends(get_db),
     users_service: UsersService = Depends(get_users_service),
 ):
+    """
+    Devuelve una serie temporal de predicciones:
+    - total, phishing, legitimate
+    Filtros:
+    - admin: puede filtrar por user_email
+    - user: siempre queda restringido a su propio user_id
+    """
     usuario = _get_current_user(db, request)
 
     if group_by not in {"day", "week", "month"}:
@@ -308,21 +315,33 @@ def timeline_stats(
     # Rango temporal (UTC)
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
+    # Columnas agregadas
+    bucket_col = func.date_trunc(group_by, Prediccion.created_at).label("bucket")
+    total_col = func.count(Prediccion.id).label("count")
+
+    phishing_col = func.sum(
+        case((Prediccion.prediccion == "phishing", 1), else_=0)
+    ).label("phishing")
+
+    legit_col = func.sum(
+        case((Prediccion.prediccion == "legitimate", 1), else_=0)
+    ).label("legitimate")
+
     # Base query: predicciones + email (para filtrar por user_id)
     q = (
         db.query(
-            func.date_trunc(group_by, Prediccion.created_at).label("bucket"),
-            func.cast(func.count(Prediccion.id), Integer).label("count"),
-            func.cast(func.sum(func.case((Prediccion.prediccion == "phishing", 1), else_=0)), Integer).label("phishing"),
-            func.cast(func.sum(func.case((Prediccion.prediccion == "legitimate", 1), else_=0)), Integer).label("legitimate"),
+            bucket_col,
+            func.cast(total_col, Integer),
+            func.cast(phishing_col, Integer),
+            func.cast(legit_col, Integer),
         )
         .join(Email, Prediccion.email_id == Email.id)
         .filter(Prediccion.created_at >= since)
     )
 
     # Filtro por usuario:
-    # - si es admin: puede filtrar por user_email si lo envía
-    # - si no es admin: siempre se fuerza a su propio user_id
+    # - admin: puede filtrar por user_email si lo envía
+    # - user: se fuerza a su propio user_id
     if _is_admin(usuario):
         if user_email:
             target = users_service.get_user_by_email(db, user_email)
@@ -333,8 +352,8 @@ def timeline_stats(
         q = q.filter(Email.user_id == int(getattr(usuario, "id")))
 
     rows = (
-        q.group_by(text("bucket"))
-         .order_by(text("bucket"))
+        q.group_by(bucket_col)
+         .order_by(bucket_col)
          .all()
     )
 
@@ -345,10 +364,10 @@ def timeline_stats(
         "user_email": user_email if _is_admin(usuario) else getattr(usuario, "email", None),
         "series": [
             {
-                "date": r.bucket.isoformat(),   # bucket datetime
+                "date": r.bucket.isoformat(),
                 "total": r.count or 0,
-                "phishing": r.phishing or 0,
-                "legitimate": r.legitimate or 0,
+                "phishing": int(r.phishing or 0),
+                "legitimate": int(r.legitimate or 0),
             }
             for r in rows
         ],
