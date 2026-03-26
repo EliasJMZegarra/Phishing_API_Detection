@@ -1,6 +1,7 @@
 from fastapi import APIRouter,Request,HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text, Integer,case
+from sqlalchemy import func, Integer, case
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 from app.database import get_db
 from app.services.emails_service import EmailsService, get_emails_service
@@ -296,79 +297,83 @@ def timeline_stats(
     request: Request,
     days: int = 90,
     group_by: str = "week",  # day | week | month
-    user_email: str | None = None,
+    user_email: Optional[str] = None,
     db: Session = Depends(get_db),
     users_service: UsersService = Depends(get_users_service),
 ):
     """
-    Devuelve una serie temporal de predicciones:
+    Devuelve serie temporal:
     - total, phishing, legitimate
-    Filtros:
-    - admin: puede filtrar por user_email
-    - user: siempre queda restringido a su propio user_id
+    Requiere header: X-User-Email
+    Admin: puede filtrar por user_email
+    User: siempre forzado a su propio user_id
     """
-    usuario = _get_current_user(db, request)
+    try:
+        usuario = _get_current_user(db, request)
 
-    if group_by not in {"day", "week", "month"}:
-        raise HTTPException(status_code=400, detail="group_by inválido. Use: day, week, month.")
+        if group_by not in {"day", "week", "month"}:
+            raise HTTPException(status_code=400, detail="group_by inválido. Use: day, week, month.")
 
-    # Rango temporal (UTC)
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Columnas agregadas
-    bucket_col = func.date_trunc(group_by, Prediccion.created_at).label("bucket")
-    total_col = func.count(Prediccion.id).label("count")
+        # Columnas agregadas (NO usar alias textual en group_by)
+        bucket_col = func.date_trunc(group_by, Prediccion.created_at).label("bucket")
 
-    phishing_col = func.sum(
-        case((Prediccion.prediccion == "phishing", 1), else_=0)
-    ).label("phishing")
+        total_col = func.count(Prediccion.id).label("total")
 
-    legit_col = func.sum(
-        case((Prediccion.prediccion == "legitimate", 1), else_=0)
-    ).label("legitimate")
+        phishing_col = func.sum(
+            case((Prediccion.prediccion == "phishing", 1), else_=0)
+        ).label("phishing")
 
-    # Base query: predicciones + email (para filtrar por user_id)
-    q = (
-        db.query(
-            bucket_col,
-            func.cast(total_col, Integer),
-            func.cast(phishing_col, Integer),
-            func.cast(legit_col, Integer),
+        legit_col = func.sum(
+            case((Prediccion.prediccion == "legitimate", 1), else_=0)
+        ).label("legitimate")
+
+        q = (
+            db.query(
+                bucket_col,
+                func.cast(total_col, Integer),
+                func.cast(phishing_col, Integer),
+                func.cast(legit_col, Integer),
+            )
+            .join(Email, Prediccion.email_id == Email.id)
+            .filter(Prediccion.created_at >= since)
         )
-        .join(Email, Prediccion.email_id == Email.id)
-        .filter(Prediccion.created_at >= since)
-    )
 
-    # Filtro por usuario:
-    # - admin: puede filtrar por user_email si lo envía
-    # - user: se fuerza a su propio user_id
-    if _is_admin(usuario):
-        if user_email:
-            target = users_service.get_user_by_email(db, user_email)
-            if not target:
-                raise HTTPException(status_code=404, detail="user_email no existe.")
-            q = q.filter(Email.user_id == int(getattr(target, "id")))
-    else:
-        q = q.filter(Email.user_id == int(getattr(usuario, "id")))
+        # Filtro por usuario
+        if _is_admin(usuario):
+            if user_email:
+                target = users_service.get_user_by_email(db, user_email)
+                if not target:
+                    raise HTTPException(status_code=404, detail="user_email no existe.")
+                q = q.filter(Email.user_id == int(getattr(target, "id")))
+        else:
+            q = q.filter(Email.user_id == int(getattr(usuario, "id")))
 
-    rows = (
-        q.group_by(bucket_col)
-         .order_by(bucket_col)
-         .all()
-    )
+        rows = (
+            q.group_by(bucket_col)
+             .order_by(bucket_col)
+             .all()
+        )
 
-    return {
-        "status": "ok",
-        "days": days,
-        "group_by": group_by,
-        "user_email": user_email if _is_admin(usuario) else getattr(usuario, "email", None),
-        "series": [
-            {
-                "date": r.bucket.isoformat(),
-                "total": r.count or 0,
-                "phishing": int(r.phishing or 0),
-                "legitimate": int(r.legitimate or 0),
-            }
-            for r in rows
-        ],
-    }
+        return {
+            "status": "ok",
+            "days": days,
+            "group_by": group_by,
+            "user_email": user_email if _is_admin(usuario) else getattr(usuario, "email", None),
+            "series": [
+                {
+                    "date": r.bucket.isoformat(),
+                    "total": int(r.total or 0),
+                    "phishing": int(r.phishing or 0),
+                    "legitimate": int(r.legitimate or 0),
+                }
+                for r in rows
+            ],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # MUY IMPORTANTE: esto hace que el curl te muestre el error real
+        raise HTTPException(status_code=500, detail=f"timeline_stats error: {repr(e)}")
