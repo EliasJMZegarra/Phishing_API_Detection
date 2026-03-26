@@ -332,9 +332,9 @@ def timeline_stats(
         q = (
             db.query(
                 bucket_col,
-                func.cast(total_col, Integer),
-                func.cast(phishing_col, Integer),
-                func.cast(legit_col, Integer),
+                func.cast(total_col, Integer).label("total"),
+                func.cast(phishing_col, Integer).label("phishing"),
+                func.cast(legit_col, Integer).label("legitimate"),
             )
             .join(Email, Prediccion.email_id == Email.id)
             .filter(Prediccion.created_at >= since)

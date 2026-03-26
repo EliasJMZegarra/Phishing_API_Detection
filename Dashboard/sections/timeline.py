@@ -32,7 +32,7 @@ def render():
         selected_email = None if pick == "(Todos)" else pick
 
     # 3) days fijo (90)
-    data = get_timeline(group_by=group_by, days=90, user_email=selected_email)
+    data = get_timeline(group_by=group_by, days=90, target_email=selected_email)
 
     if "error" in data:
         st.error(f"Error al obtener datos: {data['error']}")

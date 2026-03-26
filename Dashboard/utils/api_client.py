@@ -100,13 +100,20 @@ def get_users_list(user_email: str | None = None):
 
     return _get("/dashboard/users", user_email=user_email)
 
-def get_timeline(group_by="week", days=90, user_email: str | None = None):
-    # Si no viene email explícito, lo tomamos SIEMPRE de la sesión
-    if not user_email:
-        user = st.session_state.get("user") or {}
-        if isinstance(user, dict):
-            maybe_email = user.get("email")
-            user_email = maybe_email if isinstance(maybe_email, str) else None
+def get_timeline(group_by="week", days=90, target_email: str | None = None):
+    """
+    - caller_email (header X-User-Email): SIEMPRE el usuario logueado del dashboard
+    - target_email (query param user_email): opcional, solo para filtrar (admin)
+    """
+    # caller desde sesión
+    caller_email = None
+    user = st.session_state.get("user") or {}
+    if isinstance(user, dict):
+        maybe_email = user.get("email")
+        caller_email = maybe_email if isinstance(maybe_email, str) else None
 
     params = {"group_by": group_by, "days": days}
-    return _get("/dashboard/stats/timeline", user_email=user_email, params=params)
+    if target_email:
+        params["user_email"] = target_email  # filtro para admin
+
+    return _get("/dashboard/stats/timeline", user_email=caller_email, params=params)
