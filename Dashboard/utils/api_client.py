@@ -91,12 +91,22 @@ def get_activity(user_email: str, access_token: str | None = None):
 def get_emails(user_email: str, access_token: str | None = None):
     return _get("/dashboard/emails", user_email=user_email, access_token=access_token)
 
-def get_users_list(user_email: str | None = None, access_token: str | None = None):
-    """Lista de usuarios (solo admin)."""
-    return _get("/dashboard/users", user_email=user_email, access_token=access_token)
+def get_users_list(user_email: str | None = None):
+    if not user_email:
+        user = st.session_state.get("user") or {}
+        if isinstance(user, dict):
+            maybe_email = user.get("email")
+            user_email = maybe_email if isinstance(maybe_email, str) else None
+
+    return _get("/dashboard/users", user_email=user_email)
 
 def get_timeline(group_by="week", days=90, user_email: str | None = None):
+    # Si no viene email explícito, lo tomamos SIEMPRE de la sesión
+    if not user_email:
+        user = st.session_state.get("user") or {}
+        if isinstance(user, dict):
+            maybe_email = user.get("email")
+            user_email = maybe_email if isinstance(maybe_email, str) else None
+
     params = {"group_by": group_by, "days": days}
-    if user_email:
-        params["user_email"] = user_email
-    return _get("/dashboard/stats/timeline", params=params)
+    return _get("/dashboard/stats/timeline", user_email=user_email, params=params)
